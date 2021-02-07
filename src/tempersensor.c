@@ -24,7 +24,7 @@
 #include "mrtg.h"
 
 #define PROGRAMNAME "tempersensor"
-#define VERSION "0.1.1"
+#define VERSION "0.1.2"
 #define USBCommunicationTimeout 5000
 
 /*
@@ -1121,6 +1121,14 @@ int get_devnode()
 		cnt++;
 	}
 	free(devlist);
+
+	/* if there still is no real device here, we didn't find any */
+	if (device.vendor_id == 0)
+	{
+		print_error("No supported device found");
+		return 0;
+	}
+
 
 	debug_print("Will use '%s'\n",device.hidraw_devpath);
 	return 1;
