@@ -20,11 +20,11 @@ include $(TOPDIR)/rules.mk
 
 # Name and release number of this package
 PKG_NAME:=tempersensor
-PKG_VERSION:=0.0.13
+PKG_VERSION:=0.1.1
 PKG_RELEASE:=1
 PKG_MAINTAINER:=Armin Fuerst
 PKG_LICENSE:=GPL-3
-PKG_CONFIG_DEPENDS:=libusb-1.0
+PKG_CONFIG_DEPENDS:=kmod-usb-hid
 
 include $(INCLUDE_DIR)/package.mk
 
@@ -43,7 +43,7 @@ TARGET_LDFLAGS+= \
 define Package/$(PKG_NAME)
 	SECTION:=utils
 	CATEGORY:=Utilities
-	DEPENDS:=+libusb-1.0
+	DEPENDS:=
 	TITLE:=tempersensor provides temperature from TEMPer devices
 	URL:=https://www.fuerst.priv.at
 	MENU:=1
@@ -56,7 +56,6 @@ endef
 
 # define config directories
 define Package/$(PKG_NAME)/conffiles
-/etc/
 endef
 
 # Specify what needs to be done to prepare for building the package.

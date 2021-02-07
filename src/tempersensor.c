@@ -12,14 +12,19 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <string.h>
 #include <unistd.h>
-#include <libusb-1.0/libusb.h>
 #include <math.h>
+#include <linux/hidraw.h>
+#include <sys/select.h>
+#include <fcntl.h>
+#include <errno.h>
+#include <dirent.h>
 #include "mrtg.h"
 
 #define PROGRAMNAME "tempersensor"
-#define VERSION "0.0.13"
+#define VERSION "0.1.1"
 #define USBCommunicationTimeout 5000
 
 /*
@@ -39,14 +44,10 @@
  *
  */
 
-const static unsigned char ctrl[] = { 0x01, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
 const static unsigned char query_vals[] = { 0x01, 0x80, 0x33, 0x01, 0x00, 0x00, 0x00, 0x00 };
-// repeats lower 4 bytes of last response, higher bytes are always "0x82 0x02 0x00 0x00"
-// returns "0x29 0x0f 0x09 0x75" if it is the first command after device poweron
-const static unsigned char repeat[] = { 0x01, 0x82, 0x77, 0x01, 0x00, 0x00, 0x00, 0x00 };
 const static unsigned char query_firmware[] = { 0x01, 0x86, 0xff, 0x01, 0x00, 0x00, 0x00, 0x00 };
 #define ENDPOINT_INTERRUPT_IN 0x82 // comment from pcsensor.c: endpoint 0x81 address for IN
-#define ENDPOINT_INTERRUPT_OUT 0x00 // comment from pcsensor.c: endpoint 1 address for OUT
+#define ENDPOINT_INTERRUPT_OUT 0x02 // comment from pcsensor.c: endpoint 1 address for OUT
 #define ENDPOINT_BULK_IN 0x82 // comment from pcsensor.c: endpoint 0x81 address for IN
 #define ENDPOINT_BULK_OUT 0x00 // comment from pcsensor.c: endpoint 1 address for OUT
 #define INTERFACE1 0x00
@@ -66,6 +67,7 @@ const static unsigned short vendorId[] =
 		// TEMPer / TEMPerF1.4 (some tests)
 	0x413d, // TEMPer / TEMPerGold_V3.1 (untested),
 		// TEMPerHUM / TEMPerX_V3.1 (untested),
+		// TEMPerHUM / TEMPerX_V3.3 (tested),
 		// TEMPer2 / TEMPerX_V3.3 (untested)
 		// TEMPer1F / TEMPerX_V3.3 (untested)
 	0x1a86  // TEMPerX232 / TEMPerX232_V2.0 (untested)
@@ -83,12 +85,10 @@ struct config
 	int debug;
 	int precision;
 	bool fahrenheit;
-	bool ignore_read_error_of_repeat;
 	int in_sensor; /* which sensor to report as "IN" */
 	int out_sensor; /* which sensor to report as "OUT" */
 	float calibration_in;
 	float calibration_out;
-	libusb_context *libusb_ctx;
 };
 
 /* where in the values-array to find which sensor */
@@ -103,6 +103,8 @@ struct device
 	char firmware[17];
 	uint16_t vendor_id;
 	uint16_t product_id;
+	char *hidraw_devpath;
+	int fd;
 	int amount_value_responses; /* amount of bytes expected to value-request */
 	int conversion_method; /* devices have different types of representation */
 	float values[4]; /* the values read from the device */
@@ -113,8 +115,6 @@ struct device
  * global vars
  */
 
-libusb_device **devs = NULL;
-libusb_device_handle *handle = NULL;
 struct config config;
 struct device device;
 
@@ -178,8 +178,8 @@ char *option_string(const struct option *long_options)
 void usage()
 {
 	printVersion();
-	printf("\t---calibration-in=[-]n.n\tmodify result for IN\n");
-	printf("\t---calibration-out=[-]n.n\tmodify result for OUT\n");
+	printf("\t--calibration-in=[-]n.n\tmodify result for IN\n");
+	printf("\t--calibration-out=[-]n.n\tmodify result for OUT\n");
 	printf("\t--conversion-method=METHOD\toverride conversion from response\n");
 	printf("\t\t\t\t\tvalues for METHOD:\n");
 	printf("\t\t\t\t\t 1 = two's complement with 4 bits used\n");
@@ -189,7 +189,6 @@ void usage()
 	printf("\t-d, --debug\t\t\tshow debug output\n");
 	printf("\t-f, --fahrenheit\t\treport temperatures in Fahrenheit\n");
 	printf("\t-h, --help\t\t\thelp\n");
-	printf("\t-i, --ignore-read-error\t\tignore read error for repeat command\n");
 	printf("\t-p, --precision=LEN\t\tamount of decimal places (default=0)\n");
 	printf("\t--report-in=SENSOR\t\treport sensor SENSOR as IN value\n");
 	printf("\t--report-out=SENSOR\t\treport sensor SENSOR as OUT value\n");
@@ -212,12 +211,12 @@ void parse_parameters(int argc, char **argv)
 	config.debug = 0;
 	config.precision = 0;
 	config.fahrenheit = false;
-	config.ignore_read_error_of_repeat = false;
 	config.in_sensor = -1;
 	config.out_sensor = -1;
 	config.calibration_in = 0.0;
 	config.calibration_out = 0.0;
 	device.conversion_method = -1;
+	device.fd = -1;
 
 	/* create structure of options */
 	static struct option temper_options[] =
@@ -228,7 +227,6 @@ void parse_parameters(int argc, char **argv)
 		{"debug", no_argument, 0, 'd'},
 		{"fahrenheit", no_argument, 0, 'f'},
 		{"help", no_argument, 0, 'h'},
-		{"ignore-read-error", no_argument, 0, 'i'},
 		{"precision", required_argument, 0, 'p'},
 		{"report-in", required_argument, 0, 3},
 		{"report-out", required_argument, 0, 4},
@@ -294,7 +292,7 @@ void parse_parameters(int argc, char **argv)
 					itmp = EXT_HUM;
 				else
 				{
-					printf("Invalid value '%s' for option '%s'\n",
+					fprintf(stderr, "Invalid value '%s' for option '%s'\n",
 						optarg, temper_options[option_index].name);
 					usage();
 					free(os);
@@ -316,9 +314,6 @@ void parse_parameters(int argc, char **argv)
 				usage();
 				free(os);
 				exit(EXIT_SUCCESS);
-				break;
-			case 'i':
-				config.ignore_read_error_of_repeat = true;
 				break;
 			case 'p':
 				if (!(sscanf(optarg, "%i", &config.precision) == 1))
@@ -365,7 +360,7 @@ void debug_print(const char *format, ...)
 	
 	if (config.debug > 0)
 	{
-		vprintf(format, args);
+		vfprintf(stderr, format, args);
 	}
 
 	va_end(args);
@@ -380,21 +375,21 @@ float fahrenheit(float celsius)
  * extend_errormessage
  *
  * extends the given errormessage with the textual representation
- * of the libusb error.
+ * of the errno error
  */
-char *extend_errormessage(const char* errormessage, int usb_error)
+
+char *extend_errormessage(const char* errormessage, int errnum)
 {
 	char *fullmsg;
-
-	fullmsg = (char *) malloc (strlen(errormessage) +
-		strlen(libusb_strerror(usb_error)) +
-		strlen(libusb_error_name(usb_error)) + 3);
-	sprintf(fullmsg, "%s%s: %s", errormessage, 
-		libusb_error_name(usb_error),
-		libusb_strerror(usb_error));
-
+	
+	fullmsg = (char *) malloc(strlen(errormessage) +
+		strlen(strerror(errnum)) + 3);
+	sprintf(fullmsg, "%s: %s", errormessage,
+		strerror(errnum));
+	
 	return fullmsg;
 }
+
 
 /*
  * print_error
@@ -458,12 +453,12 @@ void debug_print_byte(const unsigned char *string, size_t ssize, const char *for
 	}
 	while (c<ssize)
 	{
-		printf("%02x ", string[c] & 0xFF);
+		fprintf(stderr, "%02x ", string[c] & 0xFF);
 		c++;
 	}
-	printf("(");
-	vprintf(format, args);
-	printf(")\n");
+	fprintf(stderr, "(");
+	vfprintf(stderr, format, args);
+	fprintf(stderr, ")\n");
 
 	va_end(args);
 }
@@ -474,30 +469,20 @@ void debug_print_byte(const unsigned char *string, size_t ssize, const char *for
  * returns true if the given device is in the list of
  * supported devices, otherwise returns false
  */
-bool is_device_supported(libusb_device *dev)
+bool is_device_supported(uint16_t idVendor, uint16_t idProduct)
 {
-	struct libusb_device_descriptor desc;
-	int r;
 	int known_devices;
 	int cnt = 0;
 
 	// calculate how many devices are in the list of supported devices
 	known_devices = sizeof(vendorId) / sizeof(vendorId[0]);
 
-	r = libusb_get_device_descriptor(dev, &desc);
-	if (r < 0)
-	{
-		print_error("Error getting device descriptor for a device");
-		return false;
-	}
 	while (cnt < known_devices)
 	{
-		if ((desc.idVendor == vendorId[cnt])
-			&& (desc.idProduct == productId[cnt]))
+		if ((idVendor == vendorId[cnt])
+			&& (idProduct == productId[cnt]))
 		{
 			debug_print("Device %04x:%04x found\n", vendorId[cnt], productId[cnt]);
-			device.vendor_id = desc.idVendor;
-			device.product_id = desc.idProduct;
 			return true;
 		}
 		cnt++;
@@ -505,146 +490,6 @@ bool is_device_supported(libusb_device *dev)
 	return false;
 }
 
-void print_device_id(libusb_device *dev)
-{
-	int r;
-	struct libusb_device_descriptor desc;
-	r = libusb_get_device_descriptor(dev, &desc);
-	if (r < 0)
-	{
-		print_error("Error getting device descriptor for a device");
-	}
-	printf("%04x:%04x", desc.idVendor, desc.idProduct);
-}
-
-/*
- * init_device
- *
- * find a supported device and initialize it
- */
-
-int init_device()
-{
-	int r;
-	ssize_t amt;
-	int cnt = 0;
-
-	debug_print("initializing USB\n");
-	config.libusb_ctx = NULL;
-	r = libusb_init(&config.libusb_ctx);
-	if (r < 0)
-	{
-		print_error("Error initializing USB");
-		return r;
-	}
-
-	debug_print("getting device list\n");
-	amt = libusb_get_device_list(config.libusb_ctx, &devs);
-	if (amt < 0)
-	{
-		libusb_exit(config.libusb_ctx);
-		print_error("Error getting device list");
-		return (int) amt;
-	}
-
-	debug_print("looking for supported device\n");
-	while (cnt < amt)
-	{
-		if (is_device_supported(devs[cnt]))
-		{
-			return cnt;
-		}
-		cnt++;
-	}
-	print_error("No supported device found");
-	return -1;
-}
-
-int usb_detach(int interface)
-{
-	int r;
-	char errmsg[43];
-
-	debug_print("Trying to detach interface #%i from kernel driver\n", interface + 1);
-	r = libusb_detach_kernel_driver(handle, interface);
-	if (r && r != LIBUSB_ERROR_NOT_FOUND)
-	{
-		sprintf(errmsg, "Error detaching interface #%i: ", interface + 1);
-		print_error(extend_errormessage(errmsg, r));
-		return 0;
-	}
-	else if (r == LIBUSB_ERROR_NOT_FOUND)
-	{
-		debug_print("Interface #%i was already detached from kernel driver\n", interface + 1);
-	}
-	return 1;
-}
-
-int setup_device(libusb_device *dev)
-{
-	int r;
-
-	debug_print("Opening device\n");
-	r = libusb_open(dev, &handle);
-	if (r)
-	{
-		print_error(extend_errormessage("Error opening device: ", r));
-		return 0;
-	}
-
-	// TODO: possible improvments: make interface an array and iterrate
-	if (!usb_detach(INTERFACE1))
-	{
-		return 0;
-	}
-	if (!usb_detach(INTERFACE2))
-	{
-		return 0;
-	}
-
-	debug_print("Setting configuration for device\n");
-	r = libusb_set_configuration(handle, 1);
-	if (r)
-	{
-		print_error(extend_errormessage("Could not set configuration to 1 on device: ", r));
-		return 0;
-	}
-
-	// TODO: possible improvments: make interface an array and iterrate
-	debug_print("Try to claim interface #1\n");
-	r = libusb_claim_interface(handle, INTERFACE1);
-	if (r)
-	{
-		print_error(extend_errormessage("Could not claim interface #1: ", r));
-		return 0;
-	}
-	debug_print("Try to claim interface #2\n");
-	r = libusb_claim_interface(handle, INTERFACE2);
-	if (r)
-	{
-		print_error(extend_errormessage("Could not claim interface #2: ", r));
-		return 0;
-	}
-	return 1;
-}
-
-/*
- * release interface including errorhandling
- *
- */
-void release_interface(int interface)
-{
-	int r;
-	char errmsg[51];
-
-	debug_print("Try to release interface #%i\n", interface + 1);
-	r = libusb_release_interface(handle, interface);
-	if (r)
-	{
-		sprintf(errmsg, "Cound not release interface #%i of device: ", interface + 1);
-		print_error(extend_errormessage(errmsg, r));
-	}
-}
 
 /*
  * cleanup
@@ -654,71 +499,72 @@ void release_interface(int interface)
 
 void cleanup()
 {
-	if (handle != NULL)
+	if (device.fd >= 0)
 	{
-		release_interface(INTERFACE1);
-		release_interface(INTERFACE2);
-		debug_print("Try to close handle\n");
-		libusb_close(handle);
+		close(device.fd);
 	}
-	debug_print("Exit USB\n");
-	libusb_exit(config.libusb_ctx);
 }
 
-int send_command(const char *cmdname, int report, int interface, const unsigned char *question, size_t qsize)
+int send_command(const char *cmdname, const unsigned char *question, size_t qsize)
 {
 	int r;
 	char errmsg[45];
+	char *fullerr;
 
 	debug_print_byte(question, qsize, "command '%s' sent", cmdname);
-	r = libusb_control_transfer(handle,
-		USB_request_type,
-		USB_set_report,
-		USB_output_report + report,
-		interface,
-		(unsigned char *)question,
-		qsize,
-		USBCommunicationTimeout);
+	r = write(device.fd, question, qsize);
 	if (r < 0)
 	{
 		sprintf(errmsg, "Error sending command '%s': ", cmdname);
-		print_error(errmsg);
+		fullerr = extend_errormessage(errmsg, errno);
+		print_error(fullerr);
+		free(fullerr);
 		return 0;
 	}
 
 	return 1;
 }
 
+int read_timeout(int fd, void *buf, size_t count)
+{
+	fd_set set;
+	struct timeval timeout;
+	int rv;
+	int r;
+
+	FD_ZERO(&set);
+	FD_SET(fd, &set);
+
+	timeout.tv_sec = 0;
+	timeout.tv_usec = 5*1000*1000;
+
+	rv = select(fd + 1, &set, NULL, NULL, &timeout);
+	if (rv == -1)
+		return -1;
+	else if (rv == 0)
+		return -1;
+
+	r = read(fd, buf, count);
+	if (r < 0)
+		return 0;
+
+	return r;
+}
 
 int read_answer_cond(const char *cmdname, unsigned char *answer, bool ignore_readerror)
 {
 	int r;
 	char *errmsg;
-	int transferred;
 
-	r = libusb_interrupt_transfer(handle,
-		ENDPOINT_INTERRUPT_IN,
-		answer,
-		ANSWERSIZE,
-		&transferred,
-		USBCommunicationTimeout);
+	r = read_timeout(device.fd, answer, ANSWERSIZE);
 	if (r < 0)
 	{
-		if (ignore_readerror)
+		if (! ignore_readerror)
 		{
 			errmsg = (char *) malloc (11 + strlen(cmdname));
 			sprintf(errmsg, "Error reading response to '%s': ", cmdname);
-			print_error(extend_errormessage(errmsg, r));
-		}
-		return 0;
-	}
-	if (transferred < ANSWERSIZE)
-	{
-		if (ignore_readerror)
-		{
-			errmsg = (char *) malloc (45 + strlen(cmdname));
-			sprintf(errmsg, "Short read: %i instead of %li", transferred, sizeof(answer));
 			print_error(errmsg);
+			free(errmsg);
 		}
 		return 0;
 	}
@@ -732,68 +578,6 @@ int read_answer(const char *cmdname, unsigned char *answer)
 	return read_answer_cond(cmdname, answer, false);
 }
 
-/*
- * sends a magic command and empties the buffer for the answer
- *
- */
-
-int send_magic(int magicnr, int read_answers, int report, int interface, const unsigned char *question, ssize_t qsize)
-{
-	int cnt = 0;
-	unsigned char answer[9];
-	char *cmdname;
-	int len_magicnr = 1;
-
-	if (magicnr != 0)
-	{
-		// https://stackoverflow.com/questions/3068397/finding-the-length-of-an-integer-in-c
-		len_magicnr = floor(log10(abs(magicnr))) + 1;
-	}
-	cmdname = (char *) malloc(8 + len_magicnr);
-	sprintf(cmdname, "magic #%i", magicnr);
-	if (send_command(cmdname, report, interface, question, qsize) < 0)
-	{
-		free(cmdname);
-		return 0;
-	}
-
-	while (cnt < read_answers)
-	{
-		if (!read_answer(cmdname, answer))
-		{
-			free(cmdname);
-			if (config.ignore_read_error_of_repeat)
-			{
-				debug_print("ignoring read error\n");
-				/* TODO - experimental: if resetting the device
-				 * helps, it is expected that the next run of
-				 * of tempersensor is working again. If this will
-				 * be confirmed, the could should be changed, so after
-				 * a successful reset, the init should be re-tried directly.
-				 * And it should be done independent from ignoring read errors.
-				 */
-				debug_print("resetting device\n");
-				int r = libusb_reset_device(handle);
-				if (r < 0)
-				{
-					debug_print("reset successful\n");
-				}
-				else
-				{
-					debug_print("error on reset (%i)\n",r);
-				}
-				return 1;
-			}
-			else
-			{
-				return 0;
-			}
-		}
-		cnt++;
-	}
-	free(cmdname);
-	return 1;
-}
 
 int get_firmware_string()
 {
@@ -801,7 +585,7 @@ int get_firmware_string()
 	int cnt = 0;
 
 	device.firmware[0] = 0;
-	if (!send_command("query firmware", USB_report0, INTERFACE2, query_firmware, sizeof(query_firmware))) 
+	if (!send_command("query firmware", query_firmware, sizeof(query_firmware))) 
 	{
 		return 0;
 	}
@@ -819,21 +603,27 @@ int get_firmware_string()
 }
 
 /*
- * init device, query firmware to deduce device capabilities
+ * open device and query firmware to deduce device capabilities
  *
  */
 
-int get_device_details()
+int init_device()
 {
-	if (!send_magic(1, 0, USB_report1, INTERFACE1, ctrl, sizeof(ctrl))) { return 0; }
-	/*
-	 * TODO:
-	 * repeat can be omitted, it's kept to avoid the compilation warning
-	 * at the moment while keeping the repeat-define - a better solution 
-	 * in the future will be to call it only if enabled by a parameter.
-	 */
-	if (!send_magic(2, 1, USB_report0, INTERFACE2, repeat, sizeof(repeat))) { return 0; }
-	if (!get_firmware_string()) { return 0; }
+	char *errmsg;
+
+	device.fd = open(device.hidraw_devpath, O_RDWR);
+	if (device.fd < 0)
+	{
+		errmsg = extend_errormessage("Error opening device", errno);
+		print_error(errmsg);
+		free(errmsg);
+		return 0;
+	}
+
+	if (!get_firmware_string())
+	{
+		return 0;
+	}
 	
 	return 1;
 }
@@ -849,7 +639,8 @@ int evaluate_device_details()
 {
 	int cnt = 0;
 	/*
-	 * The software is only testes with TEMPer1F_V1.3. Configuration of
+	 * The software is only tested with TEMPer1F_V1.3, TEMPerF1.4
+	 * and TEMPerHUM reporting as 'TEMPerX_V3.3'. Configuration of
 	 * all other devices is collected from several forums and from
 	 * https://github.com/urwen/temper
 	 * Idea:
@@ -898,7 +689,7 @@ int evaluate_device_details()
 		}
 		else
 		{
-			print_error("Unknown 0c45:7401 device\n");
+			print_error("Unknown 0c45:7401 device");
 			return 0;
 		}
 	}
@@ -955,10 +746,9 @@ int evaluate_device_details()
 			if (config.out_sensor == -1)
 				config.out_sensor = INT_TEMP;
 		}
-		else if ((!strncmp(device.firmware, "TEMPerX_V3.1", 12)) ||
-			(!strncmp(device.firmware, "TEMPerX_V3.3", 12)))
+		else if (!strncmp(device.firmware, "TEMPerX_V3.1", 12))
 		{
-			debug_print("Detected TEMPerX_V3.1/TEMPerX_V3.3 (untested!)\n");
+			debug_print("Detected TEMPerX_V3.1 (untested!)\n");
 			device.amount_value_responses = 2;
 			if (device.conversion_method == -1)
 				device.conversion_method = 2;
@@ -966,6 +756,21 @@ int evaluate_device_details()
 			device.sensors[0][1] = INT_HUM;
 			device.sensors[1][0] = EXT_TEMP;
 			device.sensors[1][1] = EXT_HUM;
+			if (config.in_sensor == -1)
+				config.in_sensor = INT_HUM;
+			if (config.out_sensor == -1)
+				config.out_sensor = INT_TEMP;
+		}
+		else if (!strncmp(device.firmware, "TEMPerX_V3.3", 12))
+		{
+			debug_print("Detected TEMPerX_V3.3\n");
+			device.amount_value_responses = 1;
+			if (device.conversion_method == -1)
+				device.conversion_method = 2;
+			device.sensors[0][0] = INT_TEMP;
+			device.sensors[0][1] = INT_HUM;
+			device.sensors[1][0] = NO_SENSOR;
+			device.sensors[1][1] = NO_SENSOR;
 			if (config.in_sensor == -1)
 				config.in_sensor = INT_HUM;
 			if (config.out_sensor == -1)
@@ -1102,7 +907,7 @@ int query_values()
 	int response = 0;
 	int sensor;
 
-	if (!send_command("query temperature", USB_report0, INTERFACE2, query_vals, sizeof(query_vals))) 
+	if (!send_command("query temperature", query_vals, sizeof(query_vals))) 
 	{
 		return 0;
 	}
@@ -1142,6 +947,182 @@ int query_values()
 	}
 	*/
 
+	return 1;
+}
+
+int char_index(const char *string, char c)
+{
+	for (int i = 0; string[i] != '\0'; i++)
+		if (string[i] == c)
+			return i;
+
+	return -1;
+}
+
+/*
+ * get_devnode
+ *
+ * uses /sys-dirstructure to find the appropriate hidraw device
+ */
+
+int get_devnode()
+{
+	struct hidraw_device
+	{
+		uint16_t idVendor;
+		uint16_t idProduct;
+		char devname[261];
+	};
+
+	struct hidraw_device *devlist;
+	int amount = 0;
+
+	int add_hiddev(const char *base_path)
+	{
+		int fd;
+		int r;
+		char *filepath;
+		char buf[16];
+		struct hidraw_device dev;
+
+		//dev = malloc(sizeof(dev));
+
+		/* get Vendor ID */
+		filepath = malloc(strlen(base_path) + 19);
+		(void)sprintf(filepath, "%s/../../../idVendor", base_path);
+		fd = open(filepath, O_RDONLY);
+		r = read(fd, buf, 16);
+		if (r < 0)
+		{
+			print_error("Error reading idVendor");
+			close(fd);
+			free(filepath);
+			return 0;
+		}
+		dev.idVendor = strtol(buf, NULL,16);
+		close(fd);
+		free(filepath);
+
+		/* get Product ID */
+		filepath = malloc(strlen(base_path) + 20);
+		(void)sprintf(filepath, "%s/../../../idProduct", base_path);
+		fd = open(filepath, O_RDONLY);
+		r = read(fd, buf, 16);
+		if (r < 0)
+		{
+			print_error("Error reading idProduct");
+			close(fd);
+			free(filepath);
+			return 0;
+		}
+		dev.idProduct = strtol(buf, NULL,16);
+		close(fd);
+		free(filepath);
+
+		/* get device name */
+		DIR *dir = opendir(base_path);
+		struct dirent *dp;
+
+		while ((dp = readdir(dir)) != NULL)
+		{
+			if (strstr(dp->d_name, "hidraw"))
+			{
+				(void)sprintf(dev.devname, "/dev/%s", dp->d_name);
+			}
+		}
+
+		/* copy the results to the array of structs */
+		devlist = realloc(devlist, sizeof(dev) * (amount + 1));
+		devlist[amount].idVendor = dev.idVendor;
+		devlist[amount].idProduct = dev.idProduct;
+		strcpy(devlist[amount].devname, dev.devname);
+		debug_print("VendorId: %04x\n", devlist[amount].idVendor);
+		debug_print("ProductId: %04x\n", devlist[amount].idProduct);
+		debug_print("Device: '%s'\n", devlist[amount].devname);
+		closedir(dir);
+		amount++;
+		return 1;
+	}
+
+	int find_hidraw(const char *base_path)
+	{
+		char *path;
+		struct dirent *dp;
+		DIR *dir = opendir(base_path);
+
+		if (!dir)
+			return 1;
+
+		while ((dp = readdir(dir)) != NULL)
+		{
+			if ((strcmp(dp->d_name, ".") != 0 && strcmp(dp->d_name, "..") != 0)
+				&& (dp->d_type != DT_LNK))
+			{
+				path = malloc(strlen(base_path) + strlen(dp->d_name) + 2);
+				strcpy(path, base_path);
+				strcat(path, "/");
+				strcat(path, dp->d_name);
+				if (!strcmp(dp->d_name, "hidraw"))
+				{
+					if (!add_hiddev(path))
+					{
+						closedir(dir);
+						free(path);
+						return 0;
+					}
+				}
+				else
+					find_hidraw(path);
+				free(path);
+			}
+		}
+
+		closedir(dir);
+		return 1;
+	}
+
+	devlist = NULL;
+	debug_print("Scanning for hidraw devices\n");
+	if (!find_hidraw("/sys/devices"))
+	{
+		return 0;
+	}
+
+	device.vendor_id = 0;
+	debug_print("looking for supported devices\n");
+	int cnt = 0;
+	while (cnt < amount)
+	{
+		if (is_device_supported(devlist[cnt].idVendor, devlist[cnt].idProduct))
+		{
+			if (device.vendor_id == 0)
+			{
+				device.vendor_id = devlist[cnt].idVendor;
+				device.product_id = devlist[cnt].idProduct;
+				device.hidraw_devpath = malloc(strlen(devlist[cnt].devname) + 1);
+				strcpy(device.hidraw_devpath, devlist[cnt].devname);
+			}
+			else if (device.vendor_id == devlist[cnt].idVendor)
+			{
+				if (device.hidraw_devpath < devlist[cnt].devname)
+				{
+					debug_print("Switching devpath from %s to %s\n",
+						device.hidraw_devpath, devlist[cnt].devname);
+					device.hidraw_devpath = realloc(device.hidraw_devpath, strlen(devlist[cnt].devname) + 1);
+					memcpy(device.hidraw_devpath, devlist[cnt].devname, strlen(devlist[cnt].devname));
+				}
+			}
+			else
+			{
+				debug_print("Found two supported devices, sticking to %04x:%04x and ignoring %04x:%04x\n",
+					device.vendor_id, device.product_id, devlist[cnt].idVendor, devlist[cnt].idProduct);
+			}
+		}
+		cnt++;
+	}
+	free(devlist);
+
+	debug_print("Will use '%s'\n",device.hidraw_devpath);
 	return 1;
 }
 
@@ -1311,22 +1292,14 @@ void test_calc()
 
 int main(int argc, char **argv)
 {
-	int devnum;
-
 	parse_parameters(argc, argv);
 
-	devnum = init_device();
-	if (devnum < 0)
+	if (!get_devnode())
 	{
 		cleanup();
 		exit(EXIT_FAILURE);
 	}
-	if (!setup_device(devs[devnum]))
-	{
-		cleanup();
-		exit(EXIT_FAILURE);
-	}
-	if (!get_device_details())
+	if (!init_device())
 	{
 		cleanup();
 		exit(EXIT_FAILURE);
@@ -1343,13 +1316,13 @@ int main(int argc, char **argv)
 	}
 	
 	debug_print("Found firmware: '%s'\n", device.firmware);
-	print_values(device.values[config.in_sensor], device.values[config.out_sensor], config.precision);
+	print_values(device.values[config.in_sensor], device.values[config.out_sensor], config.precision); 
 	cleanup();
 	exit(EXIT_SUCCESS);
 }
 
 /*
- * tempersensor Copyright (C) 2020 Armin Fuerst (armin@fuerst.priv.at)
+ * tempersensor Copyright (C) 2020-2021 Armin Fuerst (armin@fuerst.priv.at)
  * tempersensor is a complete rewrite based on the ideas from
  * pcsensor.c which was written by Juan Carlos Perez (cray@isp-sl.com)
  * based on Temper.c by Robert Kavaler (kavaler@diva.com)
