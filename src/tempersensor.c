@@ -24,7 +24,7 @@
 #include "mrtg.h"
 
 #define PROGRAMNAME "tempersensor"
-#define VERSION "0.1.2"
+#define VERSION "0.1.6"
 #define USBCommunicationTimeout 5000
 
 /*
@@ -44,6 +44,7 @@
  *
  */
 
+//const static unsigned char query_vals[] = { 0x01, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
 const static unsigned char query_vals[] = { 0x01, 0x80, 0x33, 0x01, 0x00, 0x00, 0x00, 0x00 };
 const static unsigned char query_firmware[] = { 0x01, 0x86, 0xff, 0x01, 0x00, 0x00, 0x00, 0x00 };
 #define ENDPOINT_INTERRUPT_IN 0x82 // comment from pcsensor.c: endpoint 0x81 address for IN
@@ -499,17 +500,21 @@ bool is_device_supported(uint16_t idVendor, uint16_t idProduct)
 
 void cleanup()
 {
+	if (device.hidraw_devpath != NULL)
+	{
+		free(device.hidraw_devpath);
+	}
 	if (device.fd >= 0)
 	{
 		close(device.fd);
 	}
 }
 
-int send_command(const char *cmdname, const unsigned char *question, size_t qsize)
+char *send_command(const char *cmdname, const unsigned char *question, size_t qsize)
 {
 	int r;
 	char errmsg[45];
-	char *fullerr;
+	char *fullerr = NULL;
 
 	debug_print_byte(question, qsize, "command '%s' sent", cmdname);
 	r = write(device.fd, question, qsize);
@@ -517,12 +522,10 @@ int send_command(const char *cmdname, const unsigned char *question, size_t qsiz
 	{
 		sprintf(errmsg, "Error sending command '%s': ", cmdname);
 		fullerr = extend_errormessage(errmsg, errno);
-		print_error(fullerr);
-		free(fullerr);
-		return 0;
+		return fullerr;
 	}
 
-	return 1;
+	return fullerr;
 }
 
 int read_timeout(int fd, void *buf, size_t count)
@@ -536,44 +539,56 @@ int read_timeout(int fd, void *buf, size_t count)
 	FD_SET(fd, &set);
 
 	timeout.tv_sec = 0;
-	timeout.tv_usec = 5*1000*1000;
+	/* set a timeout of 1 second */
+	timeout.tv_usec = 1*1000*1000;
 
 	rv = select(fd + 1, &set, NULL, NULL, &timeout);
 	if (rv == -1)
 		return -1;
 	else if (rv == 0)
-		return -1;
+		return -2;
 
 	r = read(fd, buf, count);
 	if (r < 0)
-		return 0;
+		return -1;
 
 	return r;
 }
 
-int read_answer_cond(const char *cmdname, unsigned char *answer, bool ignore_readerror)
+char *read_answer_cond(const char *cmdname, unsigned char *answer, bool ignore_readerror)
 {
 	int r;
-	char *errmsg;
+	char *errmsg = NULL;
+	char *fullerr = NULL;
 
 	r = read_timeout(device.fd, answer, ANSWERSIZE);
 	if (r < 0)
 	{
 		if (! ignore_readerror)
 		{
-			errmsg = (char *) malloc (11 + strlen(cmdname));
-			sprintf(errmsg, "Error reading response to '%s': ", cmdname);
-			print_error(errmsg);
+			errmsg = (char *) malloc (29 + strlen(cmdname));
+			sprintf(errmsg, "Error reading response to '%s'", cmdname);
+			if (r == -2)
+			{
+				fullerr = malloc (strlen(errmsg) + 10);
+				fullerr[0] = 0;
+				strcat(fullerr, errmsg);
+				strcat(fullerr, ": Timeout");
+			}
+			else
+			{
+				fullerr = extend_errormessage(errmsg, errno);
+			}
 			free(errmsg);
 		}
-		return 0;
+		return fullerr;
 	}
 	debug_print_byte(answer, ANSWERSIZE, "response to '%s'", cmdname);
 
-	return 1;
+	return fullerr;
 }
 
-int read_answer(const char *cmdname, unsigned char *answer)
+char *read_answer(const char *cmdname, unsigned char *answer)
 {
 	return read_answer_cond(cmdname, answer, false);
 }
@@ -581,18 +596,25 @@ int read_answer(const char *cmdname, unsigned char *answer)
 
 int get_firmware_string()
 {
+	char *errmsg = NULL;
 	unsigned char answer[9];
 	int cnt = 0;
 
 	device.firmware[0] = 0;
-	if (!send_command("query firmware", query_firmware, sizeof(query_firmware))) 
+	errmsg = send_command("query firmware", query_firmware, sizeof(query_firmware));
+	if (errmsg != NULL) 
 	{
+		print_error(errmsg);
+		free(errmsg);
 		return 0;
 	}
 	while (cnt < 2)
 	{
-		if (!read_answer("query firmware", answer))
+		errmsg = read_answer("query firmware", answer);
+		if (errmsg != NULL)
 		{
+			print_error(errmsg);
+			free(errmsg);
 			return 0;
 		}
 		strncat(device.firmware, (char *)answer, 8);
@@ -689,6 +711,7 @@ int evaluate_device_details()
 		}
 		else
 		{
+			debug_print("Unknown firmware '%s'\n", device.firmware);
 			print_error("Unknown 0c45:7401 device");
 			return 0;
 		}
@@ -778,12 +801,14 @@ int evaluate_device_details()
 		}
 		else
 		{
-			print_error("Unknown 413d:2107 device\n");
+			debug_print("Unknown firmware '%s'\n", device.firmware);
+			print_error("Unknown 413d:2107 device");
 			return 0;
 		}
 	}
 	else
 	{
+		debug_print("Unknown firmware '%s'\n", device.firmware);
 		print_error("Unknown device\n");
 		return 0;
 	}
@@ -903,34 +928,70 @@ float calc_value(const unsigned char *valuestring, int startchar)
  */
 int query_values()
 {
+	#define RETRIES 10
+	char *errmsg = NULL;
 	unsigned char answer[9];
-	int response = 0;
+	int response;
 	int sensor;
+	int cnt = 0;
+	int received_responses;
 
-	if (!send_command("query temperature", query_vals, sizeof(query_vals))) 
+	while (cnt < RETRIES)
 	{
-		return 0;
-	}
-
-	while (response < device.amount_value_responses)
-	{
-		if (!read_answer("query temperature", answer))
+		response = 0;
+		received_responses = 0;
+		errmsg = send_command("query values", query_vals, sizeof(query_vals));
+		if (errmsg != NULL) 
 		{
-			return 0;
-		}
-		// per response there are up to 2 sensors
-		sensor = 0;
-		while (sensor < 2)
-		{
-			if (device.sensors[response][sensor] >= 0)
+			if ((cnt + 1) < RETRIES)
 			{
-				device.values[device.sensors[response][sensor]] = 
-					calc_value(answer, (2 + (sensor * 2)));
+				debug_print("%s, retry %i/%i\n", errmsg, cnt + 1, RETRIES);
+				free(errmsg);
 			}
-			sensor++;
+			else
+			{
+				print_error(errmsg);
+				free(errmsg);
+				return 0;
+			}
 		}
+		while (response < device.amount_value_responses)
+		{
+			errmsg = read_answer("query values", answer);
+			if (errmsg != NULL)
+			{
+				debug_print("%s on try %i/%i\n", errmsg, cnt + 1, RETRIES);
+				if ((cnt + 1) >= RETRIES)
+				{
+					print_error(errmsg);
+					free(errmsg);
+					return 0;
+				}
+				free(errmsg);
+			}
+			else
+			{
+				// per response there are up to 2 sensors
+				sensor = 0;
+				while (sensor < 2)
+				{
+					if (device.sensors[response][sensor] >= 0)
+					{
+						device.values[device.sensors[response][sensor]] = 
+							calc_value(answer, (2 + (sensor * 2)));
+					}
+					sensor++;
+				}
+				received_responses++;
+			}
 
-		response++;
+			response++;
+		}
+		if (received_responses >= device.amount_value_responses)
+		{
+			break;
+		}
+		cnt++;
 	}
 	/* 
 	 * TODO: this code is left from an experimental version
@@ -1036,8 +1097,8 @@ int get_devnode()
 		devlist[amount].idVendor = dev.idVendor;
 		devlist[amount].idProduct = dev.idProduct;
 		strcpy(devlist[amount].devname, dev.devname);
-		debug_print("VendorId: %04x\n", devlist[amount].idVendor);
-		debug_print("ProductId: %04x\n", devlist[amount].idProduct);
+		debug_print("VendorId: %04x / ", devlist[amount].idVendor);
+		debug_print("ProductId: %04x / ", devlist[amount].idProduct);
 		debug_print("Device: '%s'\n", devlist[amount].devname);
 		closedir(dir);
 		amount++;
@@ -1081,6 +1142,7 @@ int get_devnode()
 		return 1;
 	}
 
+	device.hidraw_devpath = NULL;
 	devlist = NULL;
 	debug_print("Scanning for hidraw devices\n");
 	if (!find_hidraw("/sys/devices"))
@@ -1101,6 +1163,7 @@ int get_devnode()
 				device.product_id = devlist[cnt].idProduct;
 				device.hidraw_devpath = malloc(strlen(devlist[cnt].devname) + 1);
 				strcpy(device.hidraw_devpath, devlist[cnt].devname);
+				debug_print("storing %s as devpath\n", device.hidraw_devpath);
 			}
 			else if (device.vendor_id == devlist[cnt].idVendor)
 			{
@@ -1268,9 +1331,13 @@ void test_calc()
 	 * probably some other bytes define what/how many sensors are present?
 	 * Compare to TEMPer V1.3:
 	 * 80 04 06 06 06 f0 00 00
+	 * Compare to TEMPerHUM (TEMPerX_V3.3)
+	 * 80 40 0a f9 14 63 00 00
+	 * 80 40 0b 5c 14 94 00 00
 	 * Offset 0: constant 80 - could mean one temperature sensor?
 	 * Offset 1: 04 at V1.3 - this is the offset where temperature sensor has it's values
 	 *           02 at V1.4 - this is the offset where temperature sensor has it's values
+	 *           40 at TEMPerHUM (TEMPerX_V3.3) - no idea what this could mean...
 	 * Offset 2: V1.3: has always the same value as offset 3 and 4
 	 *           V1.4: first byte of value
 	 * Offset 3: V1.3: has always the same value as offset 2 and 4
