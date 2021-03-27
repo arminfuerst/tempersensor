@@ -520,7 +520,7 @@ char *send_command(const char *cmdname, const unsigned char *question, size_t qs
 	r = write(device.fd, question, qsize);
 	if (r < 0)
 	{
-		sprintf(errmsg, "Error sending command '%s': ", cmdname);
+		sprintf(errmsg, "Error sending command '%s'", cmdname);
 		fullerr = extend_errormessage(errmsg, errno);
 		return fullerr;
 	}

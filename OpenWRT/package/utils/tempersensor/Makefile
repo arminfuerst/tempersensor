@@ -24,7 +24,7 @@ PKG_VERSION:=0.1.6
 PKG_RELEASE:=1
 PKG_MAINTAINER:=Armin Fuerst
 PKG_LICENSE:=GPL-3
-PKG_CONFIG_DEPENDS:=kmod-usb-hid
+PKG_CONFIG_DEPENDS:=
 
 include $(INCLUDE_DIR)/package.mk
 
@@ -43,7 +43,7 @@ TARGET_LDFLAGS+= \
 define Package/$(PKG_NAME)
 	SECTION:=utils
 	CATEGORY:=Utilities
-	DEPENDS:=
+	DEPENDS:=+kmod-usb-hid
 	TITLE:=tempersensor provides temperature from TEMPer devices
 	URL:=https://www.fuerst.priv.at
 	MENU:=1
