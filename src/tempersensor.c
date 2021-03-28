@@ -24,7 +24,7 @@
 #include "mrtg.h"
 
 #define PROGRAMNAME "tempersensor"
-#define VERSION "0.1.7"
+#define VERSION "0.1.8"
 #define USBCommunicationTimeout 5000
 
 /*
@@ -1167,7 +1167,7 @@ int get_devnode()
 			}
 			else if (device.vendor_id == devlist[cnt].idVendor)
 			{
-				if (strcmp(device.hidraw_devpath, devlist[cnt].devname))
+				if (strcmp(device.hidraw_devpath, devlist[cnt].devname) < 0)
 				{
 					debug_print("Switching devpath from %s to %s\n",
 						device.hidraw_devpath, devlist[cnt].devname);
