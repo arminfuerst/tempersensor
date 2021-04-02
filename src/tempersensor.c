@@ -117,8 +117,8 @@ struct device
  * global vars
  */
 
-struct config config;
-struct device device;
+static struct config config;
+static struct device device;
 
 static void printVersion(void)
 {
