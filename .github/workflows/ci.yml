@@ -10,12 +10,12 @@ jobs:
     - name: build
       run: cd src && make
 
-  simple_build2:
+  strict_build:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
     - name: build
-      run: cd src && make
+      run: cd src && CFLAGS='-DDEBUG_UNUSED -DPEDANTIC -pedantic -Wno-long-long -Wall -Wextra -Wno-unused-parameter -Wno-missing-field-initializers -Wswitch -Wsign-compare -Wshadow -Wformat -Wtype-limits -Wundef -Werror -Wmissing-prototypes -Wstrict-prototypes' make
 
 #  strict_build:
 #  runs-on: ubuntu-latest
