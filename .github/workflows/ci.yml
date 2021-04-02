@@ -24,3 +24,10 @@ jobs:
     - name: build
       run: cd src && CFLAGS='-DDEBUG_UNUSED -DPEDANTIC -pedantic -Wno-long-long -Wall -Wextra -Wno-unused-parameter -Wno-missing-field-initializers -Wswitch -Wsign-compare -Wshadow -Wformat -Wtype-limits -Wundef -Werror -Wmissing-prototypes -Wstrict-prototypes' make
 
+  clang_strict:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: build
+      run: cd src && CC=clang CFLAGS='-Wno-unknown-warning-option -Wswitch-default -Wno-parentheses-equality -Wno-language-extension-token -Wno-extended-offsetof -Wconditional-uninitialized -Wincompatible-pointer-types-discards-qualifiers -Wmissing-variable-declarations' make
+
