@@ -31,3 +31,10 @@ jobs:
     - name: build
       run: cd src && CC=clang CFLAGS='-Wno-unknown-warning-option -Wswitch-default -Wno-parentheses-equality -Wno-language-extension-token -Wno-extended-offsetof -Wconditional-uninitialized -Wincompatible-pointer-types-discards-qualifiers -Wmissing-variable-declarations -Werror' make
 
+  windows_simple:
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: build
+      run: cd src && make
+
