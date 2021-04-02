@@ -36,5 +36,6 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: build
-      run: cd src && make
+      run: cd src
+      run: make
 
