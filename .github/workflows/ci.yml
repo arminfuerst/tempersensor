@@ -37,5 +37,5 @@ jobs:
     - uses: actions/checkout@v2
     - name: build
       shell: cmd
-      run: dir
+      run: call .\build.cmd
 

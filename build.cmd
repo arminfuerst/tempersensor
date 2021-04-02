@@ -1,2 +1,3 @@
+dir
 cd src
 make
