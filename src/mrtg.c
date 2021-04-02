@@ -16,7 +16,7 @@
  *
  * returns the system uptime in seconds, 0 if an error occurs
  */
-long get_uptime()
+static long get_uptime(void)
 {
 	struct sysinfo s_info;
 	int error = sysinfo(&s_info);
@@ -32,7 +32,7 @@ long get_uptime()
  *
  * return human readable timestamp
  */
-char *timeStamp()
+static char *timeStamp(void)
 {
 	char tmp[72];
 	time_t t;
@@ -62,7 +62,7 @@ char *timeStamp()
  * extends plural if the given value is != 1 and
  * adds a postfix
  */
-void extend_plural(long value, char* string, const char* extension)
+static void extend_plural(long value, char* string, const char* extension)
 {
 	if (value != 1)
 	{
@@ -77,7 +77,7 @@ void extend_plural(long value, char* string, const char* extension)
  * prints a unit human readable, respecting plural
  */
 
-char *print_unit(long value, const char* unit, const char* extension, int no_omit)
+static char *print_unit(long value, const char* unit, const char* extension, int no_omit)
 {
 	char *retstring;
 
@@ -103,7 +103,7 @@ char *print_unit(long value, const char* unit, const char* extension, int no_omi
  * returns the amount in higher units from the given
  * value in seconds and reduces the seconds
  */
-int extract_part_from_seconds(long *seconds, char* unit)
+static int extract_part_from_seconds(long *seconds, char* unit)
 {
 	int seconds_of_unit = 1;
 	int retval;
@@ -124,7 +124,7 @@ int extract_part_from_seconds(long *seconds, char* unit)
  *
  * converts seconds to human readable time
  */
-char *pretty_print_time(long seconds)
+static char *pretty_print_time(long seconds)
 {
 	int weeks;
 	int days;
@@ -211,7 +211,7 @@ MRTG_LIB_EXPORT void print_mrtg_values(const char *programname, const char *vers
 	print_mrtg_signature(programname, version, "");
 }
 
-MRTG_LIB_EXPORT char *libmrtg_version()
+MRTG_LIB_EXPORT char *libmrtg_version(void)
 {
 	return LIBMRTG_VERSION;
 }

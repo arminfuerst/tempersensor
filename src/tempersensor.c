@@ -21,6 +21,7 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <dirent.h>
+#include "temperlib.h"
 #include "mrtg.h"
 
 #define PROGRAMNAME "tempersensor"
@@ -45,8 +46,8 @@
  */
 
 //const static unsigned char query_vals[] = { 0x01, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
-const static unsigned char query_vals[] = { 0x01, 0x80, 0x33, 0x01, 0x00, 0x00, 0x00, 0x00 };
-const static unsigned char query_firmware[] = { 0x01, 0x86, 0xff, 0x01, 0x00, 0x00, 0x00, 0x00 };
+static const unsigned char query_vals[] = { 0x01, 0x80, 0x33, 0x01, 0x00, 0x00, 0x00, 0x00 };
+static const unsigned char query_firmware[] = { 0x01, 0x86, 0xff, 0x01, 0x00, 0x00, 0x00, 0x00 };
 #define ENDPOINT_INTERRUPT_IN 0x82 // comment from pcsensor.c: endpoint 0x81 address for IN
 #define ENDPOINT_INTERRUPT_OUT 0x02 // comment from pcsensor.c: endpoint 1 address for OUT
 #define ENDPOINT_BULK_IN 0x82 // comment from pcsensor.c: endpoint 0x81 address for IN
@@ -61,7 +62,7 @@ const static unsigned char query_firmware[] = { 0x01, 0x86, 0xff, 0x01, 0x00, 0x
  * nth entry of both arrays in combination define a
  * supported device.
  */
-const static unsigned short vendorId[] =
+static const unsigned short vendorId[] =
 {
 	0x1130, // Tenx Technology, Inc. Foot Pedal/Thermometer (untested)
 	0x0c45, // TEMPer / TEMPer1F_V1.3r1F (tested), 
@@ -73,7 +74,7 @@ const static unsigned short vendorId[] =
 		// TEMPer1F / TEMPerX_V3.3 (untested)
 	0x1a86  // TEMPerX232 / TEMPerX232_V2.0 (untested)
 };
-const static unsigned short productId[] =
+static const unsigned short productId[] =
 {
 	0x660c,
 	0x7401,
@@ -119,64 +120,12 @@ struct device
 struct config config;
 struct device device;
 
-/*
- * forward declarations
- */
-
-void test_calc();
-
-void printVersion()
+static void printVersion(void)
 {
 	printf("%s version %s, libmrtg version %s\n", PROGRAMNAME, VERSION, libmrtg_version());
 }
 
-/*
- * option_string
- *
- * generate the string with options for getopt_long based
- * on the struct so additional parameters don't have to be
- * added on two places.
- */
-
-char *option_string(const struct option *long_options)
-{
-	int i;
-	int len;
-	char *returnstring;
-	char tmp[2];
-
-	returnstring = (char *) malloc(1);
-	returnstring[0] = 0;
-	if (long_options == NULL)
-		return returnstring;
-	for (i = 0; long_options[i].name; i++)
-	{
-		if (((long_options[i].val >= 65) &&
-			(long_options[i].val <= 90)) ||
-			((long_options[i].val >= 97) &&
-			(long_options[i].val <= 122)))
-		{
-			len = strlen(returnstring);
-			if (long_options[i].has_arg)
-			{
-				returnstring = (char *) realloc(returnstring, len + 2 + 1);
-			}
-			else
-			{
-				returnstring = (char *) realloc(returnstring, len + 1 + 1);
-			}
-			(void)sprintf(tmp,"%c", long_options[i].val);
-			strcat(returnstring, tmp);
-			if (long_options[i].has_arg)
-			{
-				strcat(returnstring,":");
-			}
-		}
-	}
-	return returnstring;
-}
-
-void usage()
+static void usage(void)
 {
 	printVersion();
 	printf("\t--calibration-in=[-]n.n\tmodify result for IN\n");
@@ -198,11 +147,10 @@ void usage()
 	printf("\t\t\t\t\t et = external temperature\n");
 	printf("\t\t\t\t\t ih = internal humitity\n");
 	printf("\t\t\t\t\t eh = external humitity\n");
-	printf("\t-t, --test\t\t\trun tests for temperature calculation\n");
 	printf("\t-V, --version\t\t\tdisplay version information\n");
 }
 
-void parse_parameters(int argc, char **argv)
+static void parse_parameters(int argc, char **argv)
 {
 	int c;
 	int option_index;
@@ -231,7 +179,6 @@ void parse_parameters(int argc, char **argv)
 		{"precision", required_argument, 0, 'p'},
 		{"report-in", required_argument, 0, 3},
 		{"report-out", required_argument, 0, 4},
-		{"test", no_argument, 0, 't'},
 		{"version", no_argument, 0, 'V'},
 
 	};
@@ -324,11 +271,6 @@ void parse_parameters(int argc, char **argv)
 					exit(EXIT_FAILURE);
 				}
 				break;
-			case 't':
-				test_calc();
-				free(os);
-				exit(EXIT_SUCCESS);
-				break;
 			case 'V':
 				printVersion();
 				free(os);
@@ -354,7 +296,7 @@ void parse_parameters(int argc, char **argv)
  * debug_print
  */
 
-void debug_print(const char *format, ...)
+static void debug_print(const char *format, ...)
 {
 	va_list args;
 	va_start(args, format);
@@ -367,38 +309,13 @@ void debug_print(const char *format, ...)
 	va_end(args);
 }
 
-float fahrenheit(float celsius)
-{
-	return ((celsius * (9.0 / 5.0)) + 32.0);
-}
-
-/*
- * extend_errormessage
- *
- * extends the given errormessage with the textual representation
- * of the errno error
- */
-
-char *extend_errormessage(const char* errormessage, int errnum)
-{
-	char *fullmsg;
-	
-	fullmsg = (char *) malloc(strlen(errormessage) +
-		strlen(strerror(errnum)) + 3);
-	sprintf(fullmsg, "%s: %s", errormessage,
-		strerror(errnum));
-	
-	return fullmsg;
-}
-
-
 /*
  * print_error
  *
  * simplify returning errors by just having to specify the errormessage
  */
 
-void print_error(const char *errormessage)
+static void print_error(const char *errormessage)
 {
 	debug_print("%s\n", errormessage);
 	print_mrtg_error(PROGRAMNAME, VERSION, errormessage);
@@ -409,7 +326,7 @@ void print_error(const char *errormessage)
  *
  * simplify printing values by just having to specify the values
  */
-void print_values(float in, float out, int precision)
+static void print_values(float in, float out, int precision)
 {
 	char instr[30];
 	char outstr[30];
@@ -442,9 +359,9 @@ void print_values(float in, float out, int precision)
 /* 
  * debug_print_byte
  */
-void debug_print_byte(const unsigned char *string, size_t ssize, const char *format, ...)
+static void debug_print_byte(const unsigned char *string, size_t ssize, const char *format, ...)
 {
-	int c = 0;
+	size_t c = 0;
 	va_list args;
 	va_start(args, format);
 
@@ -452,7 +369,7 @@ void debug_print_byte(const unsigned char *string, size_t ssize, const char *for
 	{
 		return;
 	}
-	while (c<ssize)
+	while (c < ssize)
 	{
 		fprintf(stderr, "%02x ", string[c] & 0xFF);
 		c++;
@@ -470,7 +387,7 @@ void debug_print_byte(const unsigned char *string, size_t ssize, const char *for
  * returns true if the given device is in the list of
  * supported devices, otherwise returns false
  */
-bool is_device_supported(uint16_t idVendor, uint16_t idProduct)
+static bool is_device_supported(uint16_t idVendor, uint16_t idProduct)
 {
 	int known_devices;
 	int cnt = 0;
@@ -498,7 +415,7 @@ bool is_device_supported(uint16_t idVendor, uint16_t idProduct)
  * close and exit everything
  */
 
-void cleanup()
+static void cleanup(void)
 {
 	if (device.hidraw_devpath != NULL)
 	{
@@ -510,7 +427,7 @@ void cleanup()
 	}
 }
 
-char *send_command(const char *cmdname, const unsigned char *question, size_t qsize)
+static char *send_command(const char *cmdname, const unsigned char *question, size_t qsize)
 {
 	int r;
 	char errmsg[45];
@@ -528,7 +445,7 @@ char *send_command(const char *cmdname, const unsigned char *question, size_t qs
 	return fullerr;
 }
 
-int read_timeout(int fd, void *buf, size_t count)
+static int read_timeout(int fd, void *buf, size_t count)
 {
 	fd_set set;
 	struct timeval timeout;
@@ -555,7 +472,7 @@ int read_timeout(int fd, void *buf, size_t count)
 	return r;
 }
 
-char *read_answer_cond(const char *cmdname, unsigned char *answer, bool ignore_readerror)
+static char *read_answer_cond(const char *cmdname, unsigned char *answer, bool ignore_readerror)
 {
 	int r;
 	char *errmsg = NULL;
@@ -588,13 +505,13 @@ char *read_answer_cond(const char *cmdname, unsigned char *answer, bool ignore_r
 	return fullerr;
 }
 
-char *read_answer(const char *cmdname, unsigned char *answer)
+static char *read_answer(const char *cmdname, unsigned char *answer)
 {
 	return read_answer_cond(cmdname, answer, false);
 }
 
 
-int get_firmware_string()
+static int get_firmware_string(void)
 {
 	char *errmsg = NULL;
 	unsigned char answer[9];
@@ -629,7 +546,7 @@ int get_firmware_string()
  *
  */
 
-int init_device()
+static int init_device(void)
 {
 	char *errmsg;
 
@@ -657,7 +574,7 @@ int init_device()
  * how to interact with the device
  */
 
-int evaluate_device_details()
+static int evaluate_device_details(void)
 {
 	int cnt = 0;
 	/*
@@ -816,117 +733,10 @@ int evaluate_device_details()
 }
 
 /*
- * calc_value
- *
- * calculates value from response from given starting character
- */
-
-float calc_value(const unsigned char *valuestring, int startchar)
-{
-	/*
-	 * To be improved: send only a string with two characters
-	 * and make selection of the correct characters outside this
-	 * function, combine it with autodetection based on Firmware string.
-	 */
-
-	/*
-	   reverse engineering results for TEMPer 1.3:
-	    + relevant for this device are positions 4 + 5
-	    + in good case, the lower sigificant part of position 5
-	      is always 0
-	    + if error case, the lower sigificant part of position 5
-	      is F (or not zero?)
-	    + the value is represented in two's complement
-	    + position 4 is the part before the comma
-	    + the higher 4 bits of position 5 are after the comma
-	 */
-
-	if (device.conversion_method == 1)
-	{
-		/*
-		 * conversion_method 1: value in two's complement with fraction
-		 * If MSB is set, the temperature is negative in 2'complement form.
-		 * Since we cannot know how negative numbers are on the system,
-		 * we calculate it manually. Since TEMPer only has 4 bits after the
-		 * comma and they are the higher part of the byte, we shift the two
-		 * bytes after concatinating 4 bits to the right, deal with 12 bits
-		 * (0xFFF) and divide by 16.
-		 * Alternatively, we could omit the shift to the right, deal with
-		 * 16 bits (0xFFFF) and divide by 256.
-		 */
-
-		/* see whether we have valid result */
-		if ((valuestring[startchar + 1] & 0x0F) != 0)
-		{
-			debug_print("invalid result received\n");
-			return -999.0;
-		}
-
-		if ((valuestring[startchar] & 0x80) != 0)
-		{
-			// convert fixed comma from 2'complement form, < 0
-			// 1. ignore comma
-			// 2. subtract 1
-			// 3. invert bits
-			// 4. multiply by -1
-			// 5. divide by amount of distinct values behind the comma
-			//    - here we calculate with 4 bits => 2 by power of 4
-
-			return (float)((((((valuestring[startchar] << 8) + 
-				valuestring[startchar + 1]) >> 4) - 1) ^ 0xFFF) * -1) / pow(2, 4);
-		}
-		else
-		{
-			// convert fixed comma from 2'complement form, >= 0
-			// 1. ignore comma
-			// 2. divide by amount of distinct values behind the comma
-			//    - here we calculate with 4 bits => 2 by power of 4
-
-			return (float)(((valuestring[startchar] << 8) + valuestring[startchar + 1]) >> 4) / pow(2, 4);
-
-		}
-	}
-	else if (device.conversion_method == 2)
-	{
-		/*
-		 * conversion_method 2: value in two's complement multiplied
-		 * by 100, e.g. 22.06 °C = 2206
-		 */
-		if ((valuestring[startchar] & 0x80) != 0)
-		{
-			// convert two's complement, < 0
-			// 1. convert two bytes to integer
-			// 2. subtract 1 from integer
-			// 3. invert bits
-			// 4. make negative
-			// 5. after conversion, divide by 100
-			return (float)(((((valuestring[startchar] << 8) + valuestring[startchar + 1])
-				- 1) ^ 0xFFFF) * -1) / 100.0;
-		}
-		else
-		{
-			// convert two's complement, >= 0
-			// 1. convert to bytes to integer
-			// 2. after conversion, divide by 100
-			return (float)((valuestring[startchar] << 8) + valuestring[startchar + 1]) / 100.0;
-		}
-	}
-	else
-	{
-		/*
-		 * if an unknown conversion_method is defined,
-		 * return invalid value
-		 */
-		return -999.0;
-	}
-}
-
-
-/*
  * read values from temper
  *
  */
-int query_values()
+static int query_values(void)
 {
 	#define RETRIES 10
 	char *errmsg = NULL;
@@ -978,7 +788,11 @@ int query_values()
 					if (device.sensors[response][sensor] >= 0)
 					{
 						device.values[device.sensors[response][sensor]] = 
-							calc_value(answer, (2 + (sensor * 2)));
+							calc_value(answer, (2 + (sensor * 2)), device.conversion_method);
+						if (device.values[device.sensors[response][sensor]] == -999.0)
+						{
+							debug_print("invalid result received for sensor %i\n", sensor);
+						}
 					}
 					sensor++;
 				}
@@ -1011,14 +825,137 @@ int query_values()
 	return 1;
 }
 
-int char_index(const char *string, char c)
-{
-	for (int i = 0; string[i] != '\0'; i++)
-		if (string[i] == c)
-			return i;
+/*
+ * hidraw_device
+ *
+ * used by get_devnode and related functions
+ */
 
-	return -1;
+struct hidraw_device
+{
+	uint16_t idVendor;
+	uint16_t idProduct;
+	char devname[261];
+};
+
+
+/*
+ * add_hiddev
+ *
+ * used by find_hidraw: adds any hidraw device found in /sys/devices
+ * to a list being scanned later for known devices
+ */
+static int add_hiddev(const char *base_path, struct hidraw_device **devlist, int *amount)
+{
+	int fd;
+	int r;
+	char *filepath;
+	char buf[16];
+	struct hidraw_device dev;
+
+	/* get Vendor ID */
+	filepath = malloc(strlen(base_path) + 19);
+	(void)sprintf(filepath, "%s/../../../idVendor", base_path);
+	fd = open(filepath, O_RDONLY);
+	r = read(fd, buf, 16);
+	if (r < 0)
+	{
+		print_error("Error reading idVendor");
+		close(fd);
+		free(filepath);
+		return 0;
+	}
+	dev.idVendor = strtol(buf, NULL,16);
+	close(fd);
+	free(filepath);
+
+	/* get Product ID */
+	filepath = malloc(strlen(base_path) + 20);
+	(void)sprintf(filepath, "%s/../../../idProduct", base_path);
+	fd = open(filepath, O_RDONLY);
+	r = read(fd, buf, 16);
+	if (r < 0)
+	{
+		print_error("Error reading idProduct");
+		close(fd);
+		free(filepath);
+		return 0;
+	}
+	dev.idProduct = strtol(buf, NULL,16);
+	close(fd);
+	free(filepath);
+
+	/* get device name */
+	DIR *dir = opendir(base_path);
+	struct dirent *dp;
+
+	while ((dp = readdir(dir)) != NULL)
+	{
+		if (strstr(dp->d_name, "hidraw"))
+		{
+			(void)sprintf(dev.devname, "/dev/%s", dp->d_name);
+		}
+	}
+
+	/* copy the results to the array of structs */
+	*devlist = realloc(*devlist, sizeof(dev) * (*amount + 1));
+	(*devlist)[*amount].idVendor = dev.idVendor;
+	(*devlist)[*amount].idProduct = dev.idProduct;
+	strcpy((*devlist)[*amount].devname, dev.devname);
+	debug_print("VendorId: %04x / ", (*devlist)[*amount].idVendor);
+	debug_print("ProductId: %04x / ", (*devlist)[*amount].idProduct);
+	debug_print("Device: '%s'\n", (*devlist)[*amount].devname);
+	closedir(dir);
+	*amount = *amount + 1;
+	return 1;
 }
+
+/*
+ * find_hidraw
+ *
+ * scans the /sys-directory structure for hidraw devices
+ * and puts all found devices into a list
+ */
+
+static int find_hidraw(const char *base_path, struct hidraw_device **devlist, int *amount)
+{
+	char *path;
+	struct dirent *dp;
+	DIR *dir = opendir(base_path);
+
+	if (!dir)
+		return 1;
+
+	while ((dp = readdir(dir)) != NULL)
+	{
+		if ((strcmp(dp->d_name, ".") != 0 && strcmp(dp->d_name, "..") != 0)
+			&& (dp->d_type != DT_LNK))
+		{
+			path = malloc(strlen(base_path) + strlen(dp->d_name) + 2);
+			strcpy(path, base_path);
+			strcat(path, "/");
+			strcat(path, dp->d_name);
+			if (!strcmp(dp->d_name, "hidraw"))
+			{
+				if (!add_hiddev(path, devlist, amount))
+				{
+					closedir(dir);
+					free(path);
+					return 0;
+				}
+			}
+			else
+			{
+				find_hidraw(path, devlist, amount);
+			}
+			free(path);
+		}
+	}
+
+	closedir(dir);
+	return 1;
+}
+
 
 /*
  * get_devnode
@@ -1026,126 +963,15 @@ int char_index(const char *string, char c)
  * uses /sys-dirstructure to find the appropriate hidraw device
  */
 
-int get_devnode()
+static int get_devnode(void)
 {
-	struct hidraw_device
-	{
-		uint16_t idVendor;
-		uint16_t idProduct;
-		char devname[261];
-	};
-
 	struct hidraw_device *devlist;
 	int amount = 0;
-
-	int add_hiddev(const char *base_path)
-	{
-		int fd;
-		int r;
-		char *filepath;
-		char buf[16];
-		struct hidraw_device dev;
-
-		//dev = malloc(sizeof(dev));
-
-		/* get Vendor ID */
-		filepath = malloc(strlen(base_path) + 19);
-		(void)sprintf(filepath, "%s/../../../idVendor", base_path);
-		fd = open(filepath, O_RDONLY);
-		r = read(fd, buf, 16);
-		if (r < 0)
-		{
-			print_error("Error reading idVendor");
-			close(fd);
-			free(filepath);
-			return 0;
-		}
-		dev.idVendor = strtol(buf, NULL,16);
-		close(fd);
-		free(filepath);
-
-		/* get Product ID */
-		filepath = malloc(strlen(base_path) + 20);
-		(void)sprintf(filepath, "%s/../../../idProduct", base_path);
-		fd = open(filepath, O_RDONLY);
-		r = read(fd, buf, 16);
-		if (r < 0)
-		{
-			print_error("Error reading idProduct");
-			close(fd);
-			free(filepath);
-			return 0;
-		}
-		dev.idProduct = strtol(buf, NULL,16);
-		close(fd);
-		free(filepath);
-
-		/* get device name */
-		DIR *dir = opendir(base_path);
-		struct dirent *dp;
-
-		while ((dp = readdir(dir)) != NULL)
-		{
-			if (strstr(dp->d_name, "hidraw"))
-			{
-				(void)sprintf(dev.devname, "/dev/%s", dp->d_name);
-			}
-		}
-
-		/* copy the results to the array of structs */
-		devlist = realloc(devlist, sizeof(dev) * (amount + 1));
-		devlist[amount].idVendor = dev.idVendor;
-		devlist[amount].idProduct = dev.idProduct;
-		strcpy(devlist[amount].devname, dev.devname);
-		debug_print("VendorId: %04x / ", devlist[amount].idVendor);
-		debug_print("ProductId: %04x / ", devlist[amount].idProduct);
-		debug_print("Device: '%s'\n", devlist[amount].devname);
-		closedir(dir);
-		amount++;
-		return 1;
-	}
-
-	int find_hidraw(const char *base_path)
-	{
-		char *path;
-		struct dirent *dp;
-		DIR *dir = opendir(base_path);
-
-		if (!dir)
-			return 1;
-
-		while ((dp = readdir(dir)) != NULL)
-		{
-			if ((strcmp(dp->d_name, ".") != 0 && strcmp(dp->d_name, "..") != 0)
-				&& (dp->d_type != DT_LNK))
-			{
-				path = malloc(strlen(base_path) + strlen(dp->d_name) + 2);
-				strcpy(path, base_path);
-				strcat(path, "/");
-				strcat(path, dp->d_name);
-				if (!strcmp(dp->d_name, "hidraw"))
-				{
-					if (!add_hiddev(path))
-					{
-						closedir(dir);
-						free(path);
-						return 0;
-					}
-				}
-				else
-					find_hidraw(path);
-				free(path);
-			}
-		}
-
-		closedir(dir);
-		return 1;
-	}
 
 	device.hidraw_devpath = NULL;
 	devlist = NULL;
 	debug_print("Scanning for hidraw devices\n");
-	if (!find_hidraw("/sys/devices"))
+	if (!find_hidraw("/sys/devices", &devlist, &amount))
 	{
 		return 0;
 	}
@@ -1200,169 +1026,6 @@ int get_devnode()
 
 	debug_print("Will use '%s'\n",device.hidraw_devpath);
 	return 1;
-}
-
-void test_calc()
-{
-	unsigned char answer[4096];
-	float tmp;
-
-	// there will only be an output in debug mode
-	config.debug = 1;
-	device.conversion_method = 1;
-
-	memmove(answer, (unsigned char[8]){ 0x80, 0x04, 0x00, 0x00, 0xff, 0xff, 0x00, 0x00 }, 8);
-	tmp = calc_value(answer, 4);
-	debug_print("temp: %.4f / expected: error (-999.00)\n", tmp);
-
-	memmove(answer, (unsigned char[8]){ 0x80, 0x04, 0xff, 0xff, 0x00, 0x00, 0x00, 0x00 }, 8);
-	tmp = calc_value(answer, 2);
-	debug_print("temp: %.4f / expected: error (-999.00)\n", tmp);
-
-	memmove(answer, (unsigned char[8]){ 0x80, 0x04, 0x1a, 0x1a, 0x1a, 0x10, 0x00, 0x00 }, 8);
-	tmp = calc_value(answer, 4);
-	debug_print("temp: %.4f / expected: 20.0625\n", tmp);
-
-	memmove(answer, (unsigned char[8]){ 0x80, 0x04, 0x14, 0x14, 0x14, 0xd0, 0x00, 0x00 }, 8);
-	tmp = calc_value(answer, 4);
-	debug_print("temp: %.4f / expected: 20.8125\n", tmp);
-
-	memmove(answer, (unsigned char[8]){ 0x80, 0x04, 0x01, 0x01, 0x01, 0x60, 0x00, 0x00 }, 8);
-	tmp = calc_value(answer, 4);
-	debug_print("temp: %.4f / expected: 1.3750\n", tmp);
-
-	memmove(answer, (unsigned char[8]){ 0x80, 0x04, 0x00, 0x00, 0x00, 0x60, 0x00, 0x00 }, 8);
-	tmp = calc_value(answer, 4);
-	debug_print("temp: %.4f / expected: 0.3750\n", tmp);
-
-	memmove(answer, (unsigned char[8]){ 0x80, 0x04, 0x00, 0x00, 0x00, 0x10, 0x00, 0x00 }, 8);
-	tmp = calc_value(answer, 4);
-	debug_print("temp: %.4f / expected: 0.0625\n", tmp);
-
-	memmove(answer, (unsigned char[8]){ 0x80, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 }, 8);
-	tmp = calc_value(answer, 4);
-	debug_print("temp: %.4f / expected: 0.0000\n", tmp);
-
-	memmove(answer, (unsigned char[8]){ 0x80, 0x04, 0x00, 0x00, 0xff, 0xf0, 0x00, 0x00 }, 8);
-	tmp = calc_value(answer, 4);
-	debug_print("temp: %.4f / expected: -0.0625\n", tmp);
-
-	memmove(answer, (unsigned char[8]){ 0x80, 0x04, 0xff, 0xff, 0xff, 0x40, 0x00, 0x00 }, 8);
-	tmp = calc_value(answer, 4);
-	debug_print("temp: %.4f / expected: -0.7500\n", tmp);
-
-	memmove(answer, (unsigned char[8]){ 0x80, 0x04, 0xff, 0xff, 0xff, 0x00, 0x00, 0x00 }, 8);
-	tmp = calc_value(answer, 4);
-	debug_print("temp: %.4f / expected: -1.0000\n", tmp);
-
-	memmove(answer, (unsigned char[8]){ 0x80, 0x04, 0xfe, 0xfe, 0xfe, 0xf0, 0x00, 0x00 }, 8);
-	tmp = calc_value(answer, 4);
-	debug_print("temp: %.4f / expected: -1.0625\n", tmp);
-
-	memmove(answer, (unsigned char[8]){ 0x80, 0x04, 0xfe, 0xfe, 0xfe, 0x00, 0x00, 0x00 }, 8);
-	tmp = calc_value(answer, 4);
-	debug_print("temp: %.4f / expected: -2.0000\n", tmp);
-
-	memmove(answer, (unsigned char[8]){ 0x80, 0x04, 0xfd, 0xfd, 0xfd, 0xf0, 0x00, 0x00 }, 8);
-	tmp = calc_value(answer, 4);
-	debug_print("temp: %.4f / expected: -2.0625\n", tmp);
-
-	memmove(answer, (unsigned char[8]){ 0x80, 0x04, 0xfe, 0xfe, 0x01, 0x00, 0x00, 0x00 }, 8);
-	tmp = calc_value(answer, 4);
-	debug_print("temp: %.4f / expected: 1.0000\n", tmp);
-
-	memmove(answer, (unsigned char[8]){ 0x80, 0x04, 0xfe, 0xfe, 0x00, 0x00, 0x00, 0x00 }, 8);
-	tmp = calc_value(answer, 4);
-	debug_print("temp: %.4f / expected: 0.0000\n", tmp);
-
-	memmove(answer, (unsigned char[8]){ 0x80, 0x04, 0x00, 0x00, 0xff, 0xf0, 0x00, 0x00 }, 8);
-	tmp = calc_value(answer, 4);
-	debug_print("temp: %.4f / expected: -0.0625\n", tmp);
-
-	memmove(answer, (unsigned char[8]){ 0x80, 0x04, 0xfe, 0xfe, 0xFF, 0x00, 0x00, 0x00 }, 8);
-	tmp = calc_value(answer, 4);
-	debug_print("temp: %.4f / expected: -1.0000\n", tmp);
-
-	memmove(answer, (unsigned char[8]){ 0x80, 0x04, 0xfe, 0xfe, 0xFE, 0x00, 0x00, 0x00 }, 8);
-	tmp = calc_value(answer, 4);
-	debug_print("temp: %.4f / expected: -2.0000\n", tmp);
-
-	memmove(answer, (unsigned char[8]){ 0x80, 0x04, 0xfe, 0xfe, 0xFD, 0x00, 0x00, 0x00 }, 8);
-	tmp = calc_value(answer, 4);
-	debug_print("temp: %.4f / expected: -3.0000\n", tmp);
-
-	memmove(answer, (unsigned char[8]){ 0x80, 0x04, 0xee, 0xee, 0xee, 0x40, 0x00, 0x00 }, 8);
-	tmp = fahrenheit(calc_value(answer, 4));
-	debug_print("temp: %.4f / expected: 0.0500\n", tmp);
-
-	memmove(answer, (unsigned char[8]){ 0x80, 0x04, 0xee, 0xee, 0xee, 0x30, 0x00, 0x00 }, 8);
-	tmp = fahrenheit(calc_value(answer, 4));
-	debug_print("temp: %.4f / expected: -0.0625\n", tmp);
-
-	memmove(answer, (unsigned char[8]){ 0x80, 0x04, 0xfe, 0xfe, 0x00, 0x00, 0x00, 0x00 }, 8);
-	tmp = fahrenheit(calc_value(answer, 4));
-	debug_print("temp: %.4f / expected: 32.0000\n", tmp);
-
-	memmove(answer, (unsigned char[8]){ 0x80, 0x04, 0x23, 0x23, 0x23, 0x90, 0x00, 0x00 }, 8);
-	tmp = fahrenheit(calc_value(answer, 4));
-	debug_print("temp: %.4f / expected: 96.0125\n", tmp);
-
-	device.conversion_method = 2;
-
-	memmove(answer, (unsigned char[8]){ 0x80, 0x04, 0x09, 0x66, 0x00, 0x00, 0x00, 0x00 }, 8);
-	tmp = calc_value(answer, 2);
-	debug_print("temp: %.4f / expected: 24.0600\n", tmp);
-
-	memmove(answer, (unsigned char[8]){ 0x80, 0x04, 0xf6, 0x9a, 0x00, 0x00, 0x00, 0x00 }, 8);
-	tmp = calc_value(answer, 2);
-	debug_print("temp: %.4f / expected: -24.0600\n", tmp);
-
-	memmove(answer, (unsigned char[8]){ 0x80, 0x04, 0x05, 0x90, 0x00, 0x00, 0x00, 0x00 }, 8);
-	tmp = calc_value(answer, 2);
-	debug_print("temp: %.4f / expected: 14.2400\n", tmp);
-
-	memmove(answer, (unsigned char[8]){ 0x80, 0x04, 0xfa, 0x70, 0x00, 0x00, 0x00, 0x00 }, 8);
-	tmp = calc_value(answer, 2);
-	debug_print("temp: %.4f / expected: -14.2400\n", tmp);
-
-	/* some values provided by Samuel Progin from TEMPer V1.4:
-	 * 80 02 19 30 65 72 46 31
-	 * 80 02 19 40 65 72 46 31
-	 * 80 02 19 50 65 72 46 31
-	 * 80 02 19 60 65 72 46 31
-	 * 80 02 1a 90 65 72 46 31
-	 * Temperature sensor seems to be starting at offset 2
-	 * probably the byte at offset 1 defines where the sensor values can be read?
-	 * probably some other bytes define what/how many sensors are present?
-	 * Compare to TEMPer V1.3:
-	 * 80 04 06 06 06 f0 00 00
-	 * Compare to TEMPerHUM (TEMPerX_V3.3)
-	 * 80 40 0a f9 14 63 00 00
-	 * 80 40 0b 5c 14 94 00 00
-	 * Offset 0: constant 80 - could mean one temperature sensor?
-	 * Offset 1: 04 at V1.3 - this is the offset where temperature sensor has it's values
-	 *           02 at V1.4 - this is the offset where temperature sensor has it's values
-	 *           40 at TEMPerHUM (TEMPerX_V3.3) - no idea what this could mean...
-	 * Offset 2: V1.3: has always the same value as offset 3 and 4
-	 *           V1.4: first byte of value
-	 * Offset 3: V1.3: has always the same value as offset 2 and 4
-	 *           V1.4: second byte of value
-	 * Offset 4: V1.3: first byte of value
-	 *           V1.4: constant 65
-	 * Offset 5: V1.3: second byte of value
-	 *           V1.4: constant 72
-	 * Offset 6: V1.3: constant 00
-	 *           V1.4: constant 46
-	 * Offset 7: V1.3: constant 00
-	 *           V1.4: constant 31
-	 */
-	device.conversion_method = 1;
-
-	memmove(answer, (unsigned char[8]){ 0x80, 0x02, 0x1a, 0x90, 0x65, 0x72, 0x46, 0x31 }, 8);
-	tmp = calc_value(answer, 2);
-	debug_print("temp: %.4f / expected: 26.5625\n", tmp);
-
-	exit(EXIT_SUCCESS);
 }
 
 /*

@@ -1,16 +1,16 @@
 all: tempersensor
 
-libmrtg.a: mrtg.o
-	ar -cvq libmrtg.a mrtg.o
-
 mrtg.o: mrtg.c mrtg.h
 	$(CC) $(CFLAGS) -Wall -c mrtg.c -o mrtg.o
 
-tempersensor: tempersensor.o
-	$(CC) $(LDFLAGS) -Wall tempersensor.o -o tempersensor -L. -lmrtg -lm
+temperlib.o: temperlib.c temperlib.h
+	$(CC) $(CFLAGS) -Wall -c temperlib.c -o temperlib.o
 
-tempersensor.o: libmrtg.a tempersensor.c
+tempersensor.o: tempersensor.c
 	$(CC) $(CFLAGS) -Wall -c tempersensor.c
+
+tempersensor: tempersensor.o mrtg.o temperlib.o
+	$(CC) $(LDFLAGS) -Wall tempersensor.o mrtg.o temperlib.o -o tempersensor
 
 clean:
 	rm -f tempersensor *.o *.a

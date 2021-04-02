@@ -24,7 +24,7 @@
  * in parenthesis.
  *
  */
-MRTG_LIB_EXPORT void print_mrtg_signature();
+MRTG_LIB_EXPORT void print_mrtg_signature(const char *programname, const char *version, const char *errormessage);
 
 /*
  * print_mrtg_error
@@ -32,14 +32,14 @@ MRTG_LIB_EXPORT void print_mrtg_signature();
  * Prints an errormessage as an appendix to the programname
  * and fulfills MRTG syntax by returning defined values
  */
-MRTG_LIB_EXPORT void print_mrtg_error();
+MRTG_LIB_EXPORT void print_mrtg_error(const char *programname, const char *version, const char *errormessage);
 
 /*
  * print_mrtg_values
  *
  * Prints in and out value and fulfills MRTG syntax
  */
-MRTG_LIB_EXPORT void print_mrtg_values();
+MRTG_LIB_EXPORT void print_mrtg_values(const char *programname, const char *version, const char *in, const char *out);
 
 /*
  * libmrtg_version
@@ -47,7 +47,7 @@ MRTG_LIB_EXPORT void print_mrtg_values();
  * returns the version of the library
  */
 
-MRTG_LIB_EXPORT char *libmrtg_version();
+MRTG_LIB_EXPORT char *libmrtg_version(void);
 
 #endif // MRTG_H
 
