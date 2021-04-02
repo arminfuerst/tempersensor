@@ -3,14 +3,21 @@ name: GitHub CI
 on: [pull_request, push]
 
 jobs:
-  simple_build:
+  gcc_simple:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
     - name: build
       run: cd src && make
 
-  strict_build:
+  clang_simple:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: build
+      run: cd src && CC=clang make
+
+  gcc_strict:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
