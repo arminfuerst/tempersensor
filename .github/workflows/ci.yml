@@ -35,8 +35,6 @@ jobs:
     runs-on: windows-latest
     steps:
     - uses: actions/checkout@v2
-    - name: go-to-source
-      run: cd src
     - name: build
-      run: make
+      run: build.bat
 
