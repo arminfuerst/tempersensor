@@ -8,8 +8,16 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/sysinfo.h>
 #include <time.h>
+
+// https://stackoverflow.com/questions/12523704/mac-os-x-equivalent-header-file-for-sysinfo-h-in-linux
+#if defined(LINUX) || defined(__LINUX__)
+#include <sys/sysinfo.h>
+#endif
+
+#if (defined(DARWIN) || defined(__DARWIN__)) && !defined(OPERATING_SYSTEM)
+#include <sysctl>
+#endif
 
 /*
  * get_uptime
@@ -18,6 +26,7 @@
  */
 static long get_uptime(void)
 {
+#if defined(LINUX) || defined(__LINUX__)
 	struct sysinfo s_info;
 	int error = sysinfo(&s_info);
 	if(error != 0)
@@ -25,6 +34,10 @@ static long get_uptime(void)
 		return 0;
 	}
 	return s_info.uptime;
+#endif
+#if (defined(DARWIN) || defined(__DARWIN__)) && !defined(OPERATING_SYSTEM)
+	return kern.boottime;
+#endif
 }
 
 /*
