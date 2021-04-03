@@ -16,13 +16,23 @@
 #include <string.h>
 #include <unistd.h>
 #include <math.h>
-#include <linux/hidraw.h>
 #include <sys/select.h>
 #include <fcntl.h>
 #include <errno.h>
 #include <dirent.h>
 #include "temperlib.h"
 #include "mrtg.h"
+
+// https://github.com/PaulStoffregen/hid_listen/blob/master/rawhid.c
+#if defined(LINUX) || defined(__LINUX__)
+#include <linux/hidraw.h>
+#endif
+
+#if (defined(DARWIN) || defined(__DARWIN__)) && !defined(OPERATING_SYSTEM)
+#include <IOKit/IOKitLib.h>
+#include <IOKit/hid/IOHIDLib.h>
+#include <IOKit/hid/IOHIDDevice.h>
+#endif
 
 #define PROGRAMNAME "tempersensor"
 #define VERSION "0.1.8"
