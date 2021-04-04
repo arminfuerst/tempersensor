@@ -14,7 +14,7 @@
 #ifdef __linux__
 #include <sys/sysinfo.h>
 #elif __APPLE__
-#include <sysctl>
+#include <sysctl.h>
 #endif
 
 /*
