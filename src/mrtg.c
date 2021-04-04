@@ -24,7 +24,7 @@
  */
 static long get_uptime(void)
 {
-#if defined(LINUX) || defined(__LINUX__)
+#ifdef __linux__
 	struct sysinfo s_info;
 	int error = sysinfo(&s_info);
 	if(error != 0)
@@ -32,8 +32,7 @@ static long get_uptime(void)
 		return 0;
 	}
 	return s_info.uptime;
-#endif
-#if (defined(DARWIN) || defined(__DARWIN__)) && !defined(OPERATING_SYSTEM)
+#elif __APPLE__
 	return kern.boottime;
 #endif
 }
