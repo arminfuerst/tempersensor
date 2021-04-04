@@ -24,6 +24,7 @@
 #include "mrtg.h"
 
 // https://github.com/PaulStoffregen/hid_listen/blob/master/rawhid.c
+// https://www.geeksforgeeks.org/how-to-detect-operating-system-through-a-c-program/
 #ifdef __linux__
 #include <linux/hidraw.h>
 #elif __APPLE__
