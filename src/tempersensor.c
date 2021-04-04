@@ -24,11 +24,9 @@
 #include "mrtg.h"
 
 // https://github.com/PaulStoffregen/hid_listen/blob/master/rawhid.c
-#if defined(LINUX) || defined(__LINUX__)
+#ifdef __linux__
 #include <linux/hidraw.h>
-#endif
-
-#if (defined(DARWIN) || defined(__DARWIN__)) && !defined(OPERATING_SYSTEM)
+#elif __APPLE__
 #include <IOKit/IOKitLib.h>
 #include <IOKit/hid/IOHIDLib.h>
 #include <IOKit/hid/IOHIDDevice.h>

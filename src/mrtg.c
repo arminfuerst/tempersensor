@@ -11,11 +11,9 @@
 #include <time.h>
 
 // https://stackoverflow.com/questions/12523704/mac-os-x-equivalent-header-file-for-sysinfo-h-in-linux
-#if defined(LINUX) || defined(__LINUX__)
+#ifdef __linux__
 #include <sys/sysinfo.h>
-#endif
-
-#if (defined(DARWIN) || defined(__DARWIN__)) && !defined(OPERATING_SYSTEM)
+#elif __APPLE__
 #include <sysctl>
 #endif
 
