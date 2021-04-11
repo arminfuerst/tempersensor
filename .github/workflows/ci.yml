@@ -8,7 +8,7 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: build
-      run: cd src && make
+      run: ./configure && make
 
   clang_simple:
     runs-on: ubuntu-latest
