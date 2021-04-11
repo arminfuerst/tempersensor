@@ -23,7 +23,7 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: build
-      run: CFLAGS='-DDEBUG_UNUSED -DPEDANTIC -pedantic -Wno-long-long -Wall -Wextra -Wno-unused-parameter -Wno-missing-field-initializers -Wswitch -Wsign-compare -Wshadow -Wformat -Wtype-limits -Wundef -Wmissing-prototypes -Wstrict-prototypes -Wconversion' ./configure && make
+      run: echo 'AM_CFLAGS = -Werror' >> src/Makefile.am && CFLAGS='-DDEBUG_UNUSED -DPEDANTIC -pedantic -Wno-long-long -Wall -Wextra -Wno-unused-parameter -Wno-missing-field-initializers -Wswitch -Wsign-compare -Wshadow -Wformat -Wtype-limits -Wundef -Wmissing-prototypes -Wstrict-prototypes -Wconversion' ./configure && make
 
   clang_strict:
     runs-on: ubuntu-latest
