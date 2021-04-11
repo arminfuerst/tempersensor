@@ -1,4 +1,4 @@
-*.swp
+aclocal.m4
 Makefile
 Makefile.in
 config.h
