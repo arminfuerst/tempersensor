@@ -1,3 +1,5 @@
 tempersensor
 *.o
 *.a
+.deps/
+Makefile
