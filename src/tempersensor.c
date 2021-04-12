@@ -429,7 +429,7 @@ static void cleanup(void)
 
 static char *send_command(const char *cmdname, const unsigned char *question, size_t qsize)
 {
-	int r;
+	ssize_t r;
 	char errmsg[45];
 	char *fullerr = NULL;
 
@@ -445,12 +445,12 @@ static char *send_command(const char *cmdname, const unsigned char *question, si
 	return fullerr;
 }
 
-static int read_timeout(int fd, void *buf, size_t count)
+static ssize_t read_timeout(int fd, void *buf, size_t count)
 {
 	fd_set set;
 	struct timeval timeout;
 	int rv;
-	int r;
+	ssize_t r;
 
 	FD_ZERO(&set);
 	FD_SET(fd, &set);
@@ -474,7 +474,7 @@ static int read_timeout(int fd, void *buf, size_t count)
 
 static char *read_answer_cond(const char *cmdname, unsigned char *answer, bool ignore_readerror)
 {
-	int r;
+	ssize_t r;
 	char *errmsg = NULL;
 	char *fullerr = NULL;
 
@@ -845,10 +845,10 @@ struct hidraw_device
  * used by find_hidraw: adds any hidraw device found in /sys/devices
  * to a list being scanned later for known devices
  */
-static int add_hiddev(const char *base_path, struct hidraw_device **devlist, int *amount)
+static int add_hiddev(const char *base_path, struct hidraw_device **devlist, unsigned int *amount)
 {
 	int fd;
-	int r;
+	ssize_t r;
 	char *filepath;
 	char buf[16];
 	struct hidraw_device dev;
@@ -865,7 +865,7 @@ static int add_hiddev(const char *base_path, struct hidraw_device **devlist, int
 		free(filepath);
 		return 0;
 	}
-	dev.idVendor = strtol(buf, NULL,16);
+	dev.idVendor = (uint16_t)strtol(buf, NULL,16);
 	close(fd);
 	free(filepath);
 
@@ -881,7 +881,7 @@ static int add_hiddev(const char *base_path, struct hidraw_device **devlist, int
 		free(filepath);
 		return 0;
 	}
-	dev.idProduct = strtol(buf, NULL,16);
+	dev.idProduct = (uint16_t)strtol(buf, NULL,16);
 	close(fd);
 	free(filepath);
 
@@ -917,7 +917,7 @@ static int add_hiddev(const char *base_path, struct hidraw_device **devlist, int
  * and puts all found devices into a list
  */
 
-static int find_hidraw(const char *base_path, struct hidraw_device **devlist, int *amount)
+static int find_hidraw(const char *base_path, struct hidraw_device **devlist, unsigned int *amount)
 {
 	char *path;
 	struct dirent *dp;
@@ -966,7 +966,7 @@ static int find_hidraw(const char *base_path, struct hidraw_device **devlist, in
 static int get_devnode(void)
 {
 	struct hidraw_device *devlist;
-	int amount = 0;
+	unsigned int amount = 0;
 
 	device.hidraw_devpath = NULL;
 	devlist = NULL;
