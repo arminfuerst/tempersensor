@@ -978,7 +978,7 @@ static int get_devnode(void)
 
 	device.vendor_id = 0;
 	debug_print("looking for supported devices\n");
-	int cnt = 0;
+	unsigned int cnt = 0;
 	while (cnt < amount)
 	{
 		if (is_device_supported(devlist[cnt].idVendor, devlist[cnt].idProduct))
