@@ -40,13 +40,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
-    - name: build
+    - name: install check framework
+      run: sudo apt install check
+    - name: configure
       run: |
-        sudo apt install check
-        export CK_LOG_FILE_NAME=test-details.log
         echo 'AM_CFLAGS = -Werror' >> src/Makefile.am
         CFLAGS='-DDEBUG_UNUSED -DPEDANTIC -pedantic -Wno-long-long -Wall -Wextra -Wno-unused-parameter -Wno-missing-field-initializers -Wswitch -Wsign-compare -Wshadow -Wformat -Wtype-limits -Wundef -Wmissing-prototypes -Wstrict-prototypes -Wconversion' ./configure
-        make
+    - name: make
+      run: make
+    - name: build
+      run: |
+        export CK_LOG_FILE_NAME=test-details.log
         make check
         cat test/test-details.log
 
