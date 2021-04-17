@@ -10,13 +10,12 @@ jobs:
     - name: install check framework
       run: sudo apt install check
     - name: configure
-      run: |
-        export CK_LOG_FILE_NAME=test-details.log
-        ./configure
+      run: ./configure
     - name: make
       run: make
     - name: make check
       run: |
+        export CK_LOG_FILE_NAME=test-details.log
         make check
         cat test/test-details.log
 
