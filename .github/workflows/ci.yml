@@ -48,7 +48,7 @@ jobs:
         CFLAGS='-DDEBUG_UNUSED -DPEDANTIC -pedantic -Wno-long-long -Wall -Wextra -Wno-unused-parameter -Wno-missing-field-initializers -Wswitch -Wsign-compare -Wshadow -Wformat -Wtype-limits -Wundef -Wmissing-prototypes -Wstrict-prototypes -Wconversion' ./configure
     - name: make
       run: make
-    - name: build
+    - name: make check
       run: |
         export CK_LOG_FILE_NAME=test-details.log
         make check
