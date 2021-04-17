@@ -71,7 +71,7 @@ jobs:
         make check
         cat test/test-details.log
 
-  OpenWRT ath79:
+  OpenWRT-ath79:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
