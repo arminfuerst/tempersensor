@@ -12,13 +12,18 @@ jobs:
         sudo apt install check
         ./configure
         make
+        make check
 
   clang_simple:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
     - name: build
-      run: CC=clang ./configure && make
+      run: |
+        sudo apt install check
+        CC=clang ./configure
+        make
+        make check
 
   # -Werror is not working with automake
   gcc_strict:
@@ -26,12 +31,21 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: build
-      run: echo 'AM_CFLAGS = -Werror' >> src/Makefile.am && CFLAGS='-DDEBUG_UNUSED -DPEDANTIC -pedantic -Wno-long-long -Wall -Wextra -Wno-unused-parameter -Wno-missing-field-initializers -Wswitch -Wsign-compare -Wshadow -Wformat -Wtype-limits -Wundef -Wmissing-prototypes -Wstrict-prototypes -Wconversion' ./configure && make
+      run: |
+        sudo apt install check
+        echo 'AM_CFLAGS = -Werror' >> src/Makefile.am
+        CFLAGS='-DDEBUG_UNUSED -DPEDANTIC -pedantic -Wno-long-long -Wall -Wextra -Wno-unused-parameter -Wno-missing-field-initializers -Wswitch -Wsign-compare -Wshadow -Wformat -Wtype-limits -Wundef -Wmissing-prototypes -Wstrict-prototypes -Wconversion' ./configure
+        make
+        make check
 
   clang_strict:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
     - name: build
-      run: CC=clang LDFLAGS='-lm' CFLAGS='-Wno-unknown-warning-option -Wswitch-default -Wno-parentheses-equality -Wno-language-extension-token -Wno-extended-offsetof -Wconditional-uninitialized -Wincompatible-pointer-types-discards-qualifiers -Wmissing-variable-declarations -Wconversion -Werror' ./configure && make
+      run: |
+        sudo apt install check
+        CC=clang LDFLAGS='-lm' CFLAGS='-Wno-unknown-warning-option -Wswitch-default -Wno-parentheses-equality -Wno-language-extension-token -Wno-extended-offsetof -Wconditional-uninitialized -Wincompatible-pointer-types-discards-qualifiers -Wmissing-variable-declarations -Wconversion -Werror' ./configure
+        make
+        make check
 
