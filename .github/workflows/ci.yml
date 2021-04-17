@@ -90,7 +90,6 @@ jobs:
       run: |
         cd openwrt-sdk
         ./scripts/feeds update -a
-        ./scripts/feeds install -d m libusb-1.0
         make defconfig
         make prereq
         sed -i 's:CONFIG_SIGNED_PACKAGES=y:# CONFIG_SIGNED_PACKAGES is not set:g' .config
