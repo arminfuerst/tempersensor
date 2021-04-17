@@ -47,4 +47,5 @@ jobs:
         sudo apt install check
         CC=clang LDFLAGS='-lm' CFLAGS='-Wno-unknown-warning-option -Wswitch-default -Wno-parentheses-equality -Wno-language-extension-token -Wno-extended-offsetof -Wconditional-uninitialized -Wincompatible-pointer-types-discards-qualifiers -Wmissing-variable-declarations -Wconversion -Werror' ./configure
         make
+        make check
 
