@@ -86,6 +86,7 @@ jobs:
         mkdir -p package/utils/tempersensor/
         cp -R ../OpenWRT/package/ .
         cp -R ../src/ package/utils/tempersensor/
+        ls -lR package/utils/tempersensor/
     - name: configure OpenWRT SDK
       run: |
         cd openwrt-sdk
