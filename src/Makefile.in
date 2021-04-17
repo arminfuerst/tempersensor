@@ -99,10 +99,13 @@ CONFIG_CLEAN_FILES =
 CONFIG_CLEAN_VPATH_FILES =
 am__installdirs = "$(DESTDIR)$(bindir)"
 PROGRAMS = $(bin_PROGRAMS)
-am_tempersensor_OBJECTS = mrtg.$(OBJEXT) temperlib.$(OBJEXT) \
-	tempersensor.$(OBJEXT)
+am_tempersensor_OBJECTS = tempersensor-mrtg.$(OBJEXT) \
+	tempersensor-temperlib.$(OBJEXT) \
+	tempersensor-tempersensor.$(OBJEXT)
 tempersensor_OBJECTS = $(am_tempersensor_OBJECTS)
-tempersensor_LDADD = $(LDADD)
+tempersensor_DEPENDENCIES =
+tempersensor_LINK = $(CCLD) $(tempersensor_CFLAGS) $(CFLAGS) \
+	$(AM_LDFLAGS) $(LDFLAGS) -o $@
 AM_V_P = $(am__v_P_@AM_V@)
 am__v_P_ = $(am__v_P_@AM_DEFAULT_V@)
 am__v_P_0 = false
@@ -118,9 +121,14 @@ am__v_at_1 =
 DEFAULT_INCLUDES = -I.@am__isrc@ -I$(top_builddir)
 depcomp = $(SHELL) $(top_srcdir)/depcomp
 am__maybe_remake_depfiles = depfiles
-am__depfiles_remade = ./$(DEPDIR)/mrtg.Po ./$(DEPDIR)/temperlib.Po \
-	./$(DEPDIR)/tempersensor.Po
+am__depfiles_remade = ./$(DEPDIR)/tempersensor-mrtg.Po \
+	./$(DEPDIR)/tempersensor-temperlib.Po \
+	./$(DEPDIR)/tempersensor-tempersensor.Po
 am__mv = mv -f
+AM_V_lt = $(am__v_lt_@AM_V@)
+am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
+am__v_lt_0 = --silent
+am__v_lt_1 = 
 COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
 	$(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
 AM_V_CC = $(am__v_CC_@AM_V@)
@@ -252,6 +260,8 @@ top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 tempersensor_SOURCES = mrtg.c temperlib.c tempersensor.c
+tempersensor_CFLAGS = @CHECK_CFLAGS@
+tempersensor_LDADD = @CHECK_LIBS@
 all: all-am
 
 .SUFFIXES:
@@ -330,7 +340,7 @@ clean-binPROGRAMS:
 
 tempersensor$(EXEEXT): $(tempersensor_OBJECTS) $(tempersensor_DEPENDENCIES) $(EXTRA_tempersensor_DEPENDENCIES) 
 	@rm -f tempersensor$(EXEEXT)
-	$(AM_V_CCLD)$(LINK) $(tempersensor_OBJECTS) $(tempersensor_LDADD) $(LIBS)
+	$(AM_V_CCLD)$(tempersensor_LINK) $(tempersensor_OBJECTS) $(tempersensor_LDADD) $(LIBS)
 
 mostlyclean-compile:
 	-rm -f *.$(OBJEXT)
@@ -338,9 +348,9 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mrtg.Po@am__quote@ # am--include-marker
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/temperlib.Po@am__quote@ # am--include-marker
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/tempersensor.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/tempersensor-mrtg.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/tempersensor-temperlib.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/tempersensor-tempersensor.Po@am__quote@ # am--include-marker
 
 $(am__depfiles_remade):
 	@$(MKDIR_P) $(@D)
@@ -363,6 +373,48 @@ am--depfiles: $(am__depfiles_remade)
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='$<' object='$@' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(COMPILE) -c -o $@ `$(CYGPATH_W) '$<'`
+
+tempersensor-mrtg.o: mrtg.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(tempersensor_CFLAGS) $(CFLAGS) -MT tempersensor-mrtg.o -MD -MP -MF $(DEPDIR)/tempersensor-mrtg.Tpo -c -o tempersensor-mrtg.o `test -f 'mrtg.c' || echo '$(srcdir)/'`mrtg.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/tempersensor-mrtg.Tpo $(DEPDIR)/tempersensor-mrtg.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='mrtg.c' object='tempersensor-mrtg.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(tempersensor_CFLAGS) $(CFLAGS) -c -o tempersensor-mrtg.o `test -f 'mrtg.c' || echo '$(srcdir)/'`mrtg.c
+
+tempersensor-mrtg.obj: mrtg.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(tempersensor_CFLAGS) $(CFLAGS) -MT tempersensor-mrtg.obj -MD -MP -MF $(DEPDIR)/tempersensor-mrtg.Tpo -c -o tempersensor-mrtg.obj `if test -f 'mrtg.c'; then $(CYGPATH_W) 'mrtg.c'; else $(CYGPATH_W) '$(srcdir)/mrtg.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/tempersensor-mrtg.Tpo $(DEPDIR)/tempersensor-mrtg.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='mrtg.c' object='tempersensor-mrtg.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(tempersensor_CFLAGS) $(CFLAGS) -c -o tempersensor-mrtg.obj `if test -f 'mrtg.c'; then $(CYGPATH_W) 'mrtg.c'; else $(CYGPATH_W) '$(srcdir)/mrtg.c'; fi`
+
+tempersensor-temperlib.o: temperlib.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(tempersensor_CFLAGS) $(CFLAGS) -MT tempersensor-temperlib.o -MD -MP -MF $(DEPDIR)/tempersensor-temperlib.Tpo -c -o tempersensor-temperlib.o `test -f 'temperlib.c' || echo '$(srcdir)/'`temperlib.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/tempersensor-temperlib.Tpo $(DEPDIR)/tempersensor-temperlib.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='temperlib.c' object='tempersensor-temperlib.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(tempersensor_CFLAGS) $(CFLAGS) -c -o tempersensor-temperlib.o `test -f 'temperlib.c' || echo '$(srcdir)/'`temperlib.c
+
+tempersensor-temperlib.obj: temperlib.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(tempersensor_CFLAGS) $(CFLAGS) -MT tempersensor-temperlib.obj -MD -MP -MF $(DEPDIR)/tempersensor-temperlib.Tpo -c -o tempersensor-temperlib.obj `if test -f 'temperlib.c'; then $(CYGPATH_W) 'temperlib.c'; else $(CYGPATH_W) '$(srcdir)/temperlib.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/tempersensor-temperlib.Tpo $(DEPDIR)/tempersensor-temperlib.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='temperlib.c' object='tempersensor-temperlib.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(tempersensor_CFLAGS) $(CFLAGS) -c -o tempersensor-temperlib.obj `if test -f 'temperlib.c'; then $(CYGPATH_W) 'temperlib.c'; else $(CYGPATH_W) '$(srcdir)/temperlib.c'; fi`
+
+tempersensor-tempersensor.o: tempersensor.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(tempersensor_CFLAGS) $(CFLAGS) -MT tempersensor-tempersensor.o -MD -MP -MF $(DEPDIR)/tempersensor-tempersensor.Tpo -c -o tempersensor-tempersensor.o `test -f 'tempersensor.c' || echo '$(srcdir)/'`tempersensor.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/tempersensor-tempersensor.Tpo $(DEPDIR)/tempersensor-tempersensor.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='tempersensor.c' object='tempersensor-tempersensor.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(tempersensor_CFLAGS) $(CFLAGS) -c -o tempersensor-tempersensor.o `test -f 'tempersensor.c' || echo '$(srcdir)/'`tempersensor.c
+
+tempersensor-tempersensor.obj: tempersensor.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(tempersensor_CFLAGS) $(CFLAGS) -MT tempersensor-tempersensor.obj -MD -MP -MF $(DEPDIR)/tempersensor-tempersensor.Tpo -c -o tempersensor-tempersensor.obj `if test -f 'tempersensor.c'; then $(CYGPATH_W) 'tempersensor.c'; else $(CYGPATH_W) '$(srcdir)/tempersensor.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/tempersensor-tempersensor.Tpo $(DEPDIR)/tempersensor-tempersensor.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='tempersensor.c' object='tempersensor-tempersensor.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(tempersensor_CFLAGS) $(CFLAGS) -c -o tempersensor-tempersensor.obj `if test -f 'tempersensor.c'; then $(CYGPATH_W) 'tempersensor.c'; else $(CYGPATH_W) '$(srcdir)/tempersensor.c'; fi`
 
 ID: $(am__tagged_files)
 	$(am__define_uniq_tagged_files); mkid -fID $$unique
@@ -491,9 +543,9 @@ clean: clean-am
 clean-am: clean-binPROGRAMS clean-generic mostlyclean-am
 
 distclean: distclean-am
-		-rm -f ./$(DEPDIR)/mrtg.Po
-	-rm -f ./$(DEPDIR)/temperlib.Po
-	-rm -f ./$(DEPDIR)/tempersensor.Po
+		-rm -f ./$(DEPDIR)/tempersensor-mrtg.Po
+	-rm -f ./$(DEPDIR)/tempersensor-temperlib.Po
+	-rm -f ./$(DEPDIR)/tempersensor-tempersensor.Po
 	-rm -f Makefile
 distclean-am: clean-am distclean-compile distclean-generic \
 	distclean-tags
@@ -539,9 +591,9 @@ install-ps-am:
 installcheck-am:
 
 maintainer-clean: maintainer-clean-am
-		-rm -f ./$(DEPDIR)/mrtg.Po
-	-rm -f ./$(DEPDIR)/temperlib.Po
-	-rm -f ./$(DEPDIR)/tempersensor.Po
+		-rm -f ./$(DEPDIR)/tempersensor-mrtg.Po
+	-rm -f ./$(DEPDIR)/tempersensor-temperlib.Po
+	-rm -f ./$(DEPDIR)/tempersensor-tempersensor.Po
 	-rm -f Makefile
 maintainer-clean-am: distclean-am maintainer-clean-generic
 
