@@ -79,5 +79,5 @@ jobs:
         make defconfig
         make prereq
         sed -i 's:CONFIG_SIGNED_PACKAGES=y:# CONFIG_SIGNED_PACKAGES is not set:g' .config
-        make
+        make -j1 V=s
 
