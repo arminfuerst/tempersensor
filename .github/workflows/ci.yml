@@ -76,19 +76,22 @@ jobs:
         wget https://downloads.openwrt.org/releases/19.07.7/targets/ath79/generic/openwrt-sdk-19.07.7-ath79-generic_gcc-7.5.0_musl.Linux-x86_64.tar.xz
         tar -xJf openwrt-sdk-19.07.7-ath79-generic_gcc-7.5.0_musl.Linux-x86_64.tar.xz
         mv openwrt-sdk-19.07.7-ath79-generic_gcc-7.5.0_musl.Linux-x86_64 openwrt-sdk
-        cd openwrt-sdk
     - name: copy tempersensor into OpenWRT SDK
       run: |
+        cd openwrt-sdk
         mkdir -p package/utils/tempersensor/
         cp -R ../OpenWRT/package/ .
         cp -R ../src/ package/utils/tempersensor/
     - name: configure OpenWRT SDK
       run: |
+        cd openwrt-sdk
         ./scripts/feeds update -a
         ./scripts/feeds install -d m libusb-1.0
         make defconfig
         make prereq
         sed -i 's:CONFIG_SIGNED_PACKAGES=y:# CONFIG_SIGNED_PACKAGES is not set:g' .config
     - name: make
-      run: make -j1 V=s
+      run: |
+        cd openwrt-sdk
+        make -j1 V=s
 
