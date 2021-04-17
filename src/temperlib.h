@@ -5,7 +5,7 @@
  */
 
 //#include <ctype.h>
-//#include <getopt.h>
+#include <getopt.h>
 //#include <stdarg.h>
 //#include <stdbool.h>
 //#include <stdio.h>

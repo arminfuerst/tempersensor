@@ -12,7 +12,6 @@
 
 #include <check.h>
 #include <stdlib.h>
-#include <getopt.h>
 #include "../src/temperlib.h"
 
 START_TEST(extend_errormessage_someerror)

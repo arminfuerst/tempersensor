@@ -4,7 +4,6 @@
  * Additional infos (including a license notice) are at the end of this file.
  */
 
-#include <getopt.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
