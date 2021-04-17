@@ -10,7 +10,7 @@ tempersensor.o: tempersensor.c
 	$(CC) $(CFLAGS) -Wall -c tempersensor.c
 
 tempersensor: tempersensor.o mrtg.o temperlib.o
-	$(CC) $(LDFLAGS) -Wall tempersensor.o mrtg.o temperlib.o -o tempersensor -lm
+	$(CC) $(LDFLAGS) -Wall tempersensor.o mrtg.o temperlib.o -o tempersensor
 
 clean:
 	rm -f tempersensor *.o *.a

@@ -4,7 +4,6 @@
  * Additional infos (including a license notice) are at the end of this file.
  */
 
-#include <getopt.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -23,7 +22,7 @@
 char *option_string(const struct option *long_options)
 {
 	int i;
-	int len;
+	unsigned long len;
 	char *returnstring;
 	char tmp[2];
 
@@ -60,7 +59,7 @@ char *option_string(const struct option *long_options)
 
 float fahrenheit(float celsius)
 {
-	return ((celsius * (9.0 / 5.0)) + 32.0);
+	return (float)((celsius * (9.0 / 5.0)) + 32.0);
 }
 
 /*
@@ -138,8 +137,8 @@ float calc_value(const unsigned char *valuestring, int startchar, int conversion
 			// 5. divide by amount of distinct values behind the comma
 			//    - here we calculate with 4 bits => 2 by power of 4
 
-			return (float)((((((valuestring[startchar] << 8) + 
-				valuestring[startchar + 1]) >> 4) - 1) ^ 0xFFF) * -1) / pow(2, 4);
+			return (float)(((((((valuestring[startchar] << 8) +
+				valuestring[startchar + 1]) >> 4) - 1) ^ 0xFFF) * -1) / pow(2, 4));
 		}
 		else
 		{
@@ -148,7 +147,7 @@ float calc_value(const unsigned char *valuestring, int startchar, int conversion
 			// 2. divide by amount of distinct values behind the comma
 			//    - here we calculate with 4 bits => 2 by power of 4
 
-			return (float)(((valuestring[startchar] << 8) + valuestring[startchar + 1]) >> 4) / pow(2, 4);
+			return (float)((((valuestring[startchar] << 8) + valuestring[startchar + 1]) >> 4) / pow(2, 4));
 
 		}
 	}
@@ -166,15 +165,15 @@ float calc_value(const unsigned char *valuestring, int startchar, int conversion
 			// 3. invert bits
 			// 4. make negative
 			// 5. after conversion, divide by 100
-			return (float)(((((valuestring[startchar] << 8) + valuestring[startchar + 1])
-				- 1) ^ 0xFFFF) * -1) / 100.0;
+			return (float)((((((valuestring[startchar] << 8) + valuestring[startchar + 1])
+				- 1) ^ 0xFFFF) * -1) / 100.0);
 		}
 		else
 		{
 			// convert two's complement, >= 0
 			// 1. convert to bytes to integer
 			// 2. after conversion, divide by 100
-			return (float)((valuestring[startchar] << 8) + valuestring[startchar + 1]) / 100.0;
+			return (float)(((valuestring[startchar] << 8) + valuestring[startchar + 1]) / 100.0);
 		}
 	}
 	else

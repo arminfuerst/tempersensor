@@ -103,10 +103,10 @@ static char *print_unit(long value, const char* unit, const char* extension, int
  * returns the amount in higher units from the given
  * value in seconds and reduces the seconds
  */
-static int extract_part_from_seconds(long *seconds, char* unit)
+static long extract_part_from_seconds(long *seconds, char* unit)
 {
 	int seconds_of_unit = 1;
-	int retval;
+	long retval;
 
 	if (!strcmp(unit, "week")) { seconds_of_unit = 24 * 60 * 60 * 7; }
 	else if (!strcmp(unit, "day")) { seconds_of_unit = 24 * 60 * 60; }
@@ -126,10 +126,10 @@ static int extract_part_from_seconds(long *seconds, char* unit)
  */
 static char *pretty_print_time(long seconds)
 {
-	int weeks;
-	int days;
-	int minutes;
-	int hours;
+	long weeks;
+	long days;
+	long minutes;
+	long hours;
 	char *retstring;
 	char *tmp;
 

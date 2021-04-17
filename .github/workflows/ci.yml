@@ -7,27 +7,125 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
-    - name: build
-      run: cd src && make
+    - name: install check framework
+      run: sudo apt install check
+    - name: configure
+      run: ./configure
+    - name: make
+      run: make
+    - name: make check
+      run: |
+        export CK_LOG_FILE_NAME=test-details.log
+        make check
+        cat test/test-details.log
 
   clang_simple:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
-    - name: build
-      run: cd src && CC=clang make
+    - name: install check framework
+      run: sudo apt install check
+    - name: configure
+      run: CC=clang ./configure
+    - name: make
+      run: make
+    - name: make check
+      run: |
+        export CK_LOG_FILE_NAME=test-details.log
+        make check
+        cat test/test-details.log
 
+  # -Werror is not working with automake
   gcc_strict:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
-    - name: build
-      run: cd src && CFLAGS='-DDEBUG_UNUSED -DPEDANTIC -pedantic -Wno-long-long -Wall -Wextra -Wno-unused-parameter -Wno-missing-field-initializers -Wswitch -Wsign-compare -Wshadow -Wformat -Wtype-limits -Wundef -Werror -Wmissing-prototypes -Wstrict-prototypes' make
+    - name: install check framework
+      run: sudo apt install check
+    - name: configure
+      run: |
+        echo 'AM_CFLAGS = -Werror' >> src/Makefile.am
+        CFLAGS='-DDEBUG_UNUSED -DPEDANTIC -pedantic -Wno-long-long -Wall -Wextra -Wno-unused-parameter -Wno-missing-field-initializers -Wswitch -Wsign-compare -Wshadow -Wformat -Wtype-limits -Wundef -Wmissing-prototypes -Wstrict-prototypes -Wconversion' ./configure
+    - name: make
+      run: make
+    - name: make check
+      run: |
+        export CK_LOG_FILE_NAME=test-details.log
+        make check
+        cat test/test-details.log
 
   clang_strict:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
-    - name: build
-      run: cd src && CC=clang CFLAGS='-Wno-unknown-warning-option -Wswitch-default -Wno-parentheses-equality -Wno-language-extension-token -Wno-extended-offsetof -Wconditional-uninitialized -Wincompatible-pointer-types-discards-qualifiers -Wmissing-variable-declarations -Werror' make
+    - name: install check framework
+      run: sudo apt install check
+    - name: configure
+      run: |
+        CC=clang LDFLAGS='-lm' CFLAGS='-Wno-unknown-warning-option -Wswitch-default -Wno-parentheses-equality -Wno-language-extension-token -Wno-extended-offsetof -Wconditional-uninitialized -Wincompatible-pointer-types-discards-qualifiers -Wmissing-variable-declarations -Wconversion -Werror' ./configure
+    - name: make
+      run: make
+    - name: make check
+      run: |
+        export CK_LOG_FILE_NAME=test-details.log
+        make check
+        cat test/test-details.log
+
+  OpenWRT-ath79:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: get OpenWRT SDK
+      run: |
+        wget https://downloads.openwrt.org/releases/19.07.7/targets/ath79/generic/openwrt-sdk-19.07.7-ath79-generic_gcc-7.5.0_musl.Linux-x86_64.tar.xz
+        tar -xJf openwrt-sdk-19.07.7-ath79-generic_gcc-7.5.0_musl.Linux-x86_64.tar.xz
+        mv openwrt-sdk-19.07.7-ath79-generic_gcc-7.5.0_musl.Linux-x86_64 openwrt-sdk
+    - name: copy tempersensor into OpenWRT SDK
+      run: |
+        cd openwrt-sdk
+        mkdir -p package/utils/tempersensor/
+        cp -R ../OpenWRT/package/ .
+        cp -R ../src/ package/utils/tempersensor/
+    - name: configure OpenWRT SDK
+      run: |
+        cd openwrt-sdk
+        ./scripts/feeds update -a
+        make defconfig
+        make prereq
+        sed -i 's:CONFIG_SIGNED_PACKAGES=y:# CONFIG_SIGNED_PACKAGES is not set:g' .config
+    - name: make
+      run: |
+        cd openwrt-sdk
+        make
+    - name: check for ipk
+      run: ls -l openwrt-sdk/bin/packages/*/base/tempersensor_*.ipk
+
+  OpenWRT-ramips-mt7621:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: get OpenWRT SDK
+      run: |
+        wget https://downloads.openwrt.org/releases/19.07.7/targets/ramips/mt7621/openwrt-sdk-19.07.7-ramips-mt7621_gcc-7.5.0_musl.Linux-x86_64.tar.xz
+        tar -xJf openwrt-sdk-19.07.7-ramips-mt7621_gcc-7.5.0_musl.Linux-x86_64.tar.xz
+        mv openwrt-sdk-19.07.7-ramips-mt7621_gcc-7.5.0_musl.Linux-x86_64 openwrt-sdk
+    - name: copy tempersensor into OpenWRT SDK
+      run: |
+        cd openwrt-sdk
+        mkdir -p package/utils/tempersensor/
+        cp -R ../OpenWRT/package/ .
+        cp -R ../src/ package/utils/tempersensor/
+    - name: configure OpenWRT SDK
+      run: |
+        cd openwrt-sdk
+        ./scripts/feeds update -a
+        make defconfig
+        make prereq
+        sed -i 's:CONFIG_SIGNED_PACKAGES=y:# CONFIG_SIGNED_PACKAGES is not set:g' .config
+    - name: make
+      run: |
+        cd openwrt-sdk
+        make
+    - name: check for ipk
+      run: ls -l openwrt-sdk/bin/packages/*/base/tempersensor_*.ipk
 
