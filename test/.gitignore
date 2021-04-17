@@ -1,0 +1,4 @@
+check_temperlib
+*.o
+*.log
+*.trs

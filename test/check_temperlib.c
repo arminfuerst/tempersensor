@@ -10,9 +10,67 @@
  * https://libcheck.github.io/check/doc/check_html/check_3.html
  */
 
+#include <check.h>
+#include <stdlib.h>
+#include "../src/temperlib.h"
+
+START_TEST(extend_errormessage_someerror)
+{
+    char *fullerr = NULL;
+    char testerr[10];
+
+    strcpy(testerr, "Testerror");
+    fullerr = extend_errormessage(testerr, 1);
+
+    ck_assert_str_eq(testerr, "Testerror");
+    ck_assert_str_eq(fullerr, "Testerror: Operation not permitted");
+    free(fullerr);
+}
+END_TEST
+
+START_TEST(extend_errormessage_noerror)
+{
+    char *fullerr = NULL;
+    char testerr[10];
+
+    strcpy(testerr, "Testerror");
+    fullerr = extend_errormessage(testerr, 0);
+
+    ck_assert_str_eq(testerr, "Testerror");
+    ck_assert_str_eq(fullerr, "Testerror: Success");
+    free(fullerr);
+}
+END_TEST
+
+Suite *temperlib_suite(void)
+{
+    Suite *s;
+    TCase *tc_core;
+
+    s = suite_create("temperlib");
+
+    tc_core = tcase_create("temperlib");
+
+    tcase_add_test(tc_core, extend_errormessage_noerror);
+    tcase_add_test(tc_core, extend_errormessage_someerror);
+    suite_add_tcase(s, tc_core);
+
+    return s;
+}
+
 int main(void)
 {
-    return 0;
+    int number_failed;
+    Suite *s;
+    SRunner *sr;
+
+    s = temperlib_suite();
+    sr = srunner_create(s);
+
+    srunner_run_all(sr, CK_NORMAL);
+    number_failed = srunner_ntests_failed(sr);
+    srunner_free(sr);
+    return (number_failed == 0) ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 
 /*
