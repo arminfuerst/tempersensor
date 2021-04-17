@@ -97,5 +97,7 @@ jobs:
     - name: make
       run: |
         cd openwrt-sdk
-        make -j1 V=s
+        make
+    - name: check for ipk
+      run: ls -l openwrt-sdk/bin/packages/*/base/tempersensor_*.ipk
 
