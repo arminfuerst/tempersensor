@@ -13,6 +13,7 @@ jobs:
         ./configure
         make
         make check
+        cat test/test-details.log
 
   clang_simple:
     runs-on: ubuntu-latest
@@ -24,6 +25,7 @@ jobs:
         CC=clang ./configure
         make
         make check
+        cat test/test-details.log
 
   # -Werror is not working with automake
   gcc_strict:
@@ -37,6 +39,7 @@ jobs:
         CFLAGS='-DDEBUG_UNUSED -DPEDANTIC -pedantic -Wno-long-long -Wall -Wextra -Wno-unused-parameter -Wno-missing-field-initializers -Wswitch -Wsign-compare -Wshadow -Wformat -Wtype-limits -Wundef -Wmissing-prototypes -Wstrict-prototypes -Wconversion' ./configure
         make
         make check
+        cat test/test-details.log
 
   clang_strict:
     runs-on: ubuntu-latest
@@ -48,4 +51,5 @@ jobs:
         CC=clang LDFLAGS='-lm' CFLAGS='-Wno-unknown-warning-option -Wswitch-default -Wno-parentheses-equality -Wno-language-extension-token -Wno-extended-offsetof -Wconditional-uninitialized -Wincompatible-pointer-types-discards-qualifiers -Wmissing-variable-declarations -Wconversion -Werror' ./configure
         make
         make check
+        cat test/test-details.log
 
