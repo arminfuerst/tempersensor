@@ -23,12 +23,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
-    - name: build
+    - name: install check framework
+      run: sudo apt install check
+    - name: configure
+      run: CC=clang ./configure
+    - name: make
+      run: make
+    - name: make check
       run: |
-        sudo apt install check
         export CK_LOG_FILE_NAME=test-details.log
-        CC=clang ./configure
-        make
         make check
         cat test/test-details.log
 
