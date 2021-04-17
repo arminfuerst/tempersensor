@@ -10,7 +10,6 @@ jobs:
     - name: build
       run: |
         sudo apt install check
-        make clean
         ./configure
         make
         make check
@@ -22,7 +21,6 @@ jobs:
     - name: build
       run: |
         sudo apt install check
-        make clean
         CC=clang ./configure
         make
         make check
@@ -35,7 +33,6 @@ jobs:
     - name: build
       run: |
         sudo apt install check
-        make clean
         echo 'AM_CFLAGS = -Werror' >> src/Makefile.am
         CFLAGS='-DDEBUG_UNUSED -DPEDANTIC -pedantic -Wno-long-long -Wall -Wextra -Wno-unused-parameter -Wno-missing-field-initializers -Wswitch -Wsign-compare -Wshadow -Wformat -Wtype-limits -Wundef -Wmissing-prototypes -Wstrict-prototypes -Wconversion' ./configure
         make
@@ -48,7 +45,6 @@ jobs:
     - name: build
       run: |
         sudo apt install check
-        make clean
         CC=clang LDFLAGS='-lm' CFLAGS='-Wno-unknown-warning-option -Wswitch-default -Wno-parentheses-equality -Wno-language-extension-token -Wno-extended-offsetof -Wconditional-uninitialized -Wincompatible-pointer-types-discards-qualifiers -Wmissing-variable-declarations -Wconversion -Werror' ./configure
         make
 
