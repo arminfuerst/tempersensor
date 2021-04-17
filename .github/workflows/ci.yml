@@ -57,3 +57,23 @@ jobs:
         make check
         cat test/test-details.log
 
+  openwrt:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: build
+      run: |
+        wget https://downloads.openwrt.org/releases/19.07.7/targets/ath79/generic/openwrt-sdk-19.07.7-ath79-generic_gcc-7.5.0_musl.Linux-x86_64.tar.xz
+        tar -xJf openwrt-sdk-19.07.7-ath79-generic_gcc-7.5.0_musl.Linux-x86_64.tar.xz
+        mv openwrt-sdk-19.07.7-ath79-generic_gcc-7.5.0_musl.Linux-x86_64 openwrt-sdk
+        cd openwrt-sdk
+        mkdir -p package/utils/tempersensor/
+        cp -R ../OpenWRT/package/ .
+        cp -R ../src/ package/utils/tempersensor/
+        ./scripts/feeds update -a
+        ./scripts/feeds install -d m libusb-1.0
+        make defconfig
+        make prereq
+        sed -i 's:CONFIG_SIGNED_PACKAGES=y:# CONFIG_SIGNED_PACKAGES is not set:g' .config
+        make
+
