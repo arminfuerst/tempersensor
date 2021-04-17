@@ -12,6 +12,7 @@
 
 #include <check.h>
 #include <stdlib.h>
+#include <getopt.h>
 #include "../src/temperlib.h"
 
 START_TEST(extend_errormessage_someerror)
@@ -42,6 +43,31 @@ START_TEST(extend_errormessage_noerror)
 }
 END_TEST
 
+START_TEST(test_optionstring)
+{
+    char *os;
+
+    static struct option temper_options[] =
+    {
+        {"calibration-in", required_argument, 0, 0},
+        {"calibration-out", required_argument, 0, 1},
+        {"conversion-method", required_argument, 0, 2},
+        {"debug", no_argument, 0, 'd'},
+        {"fahrenheit", no_argument, 0, 'f'},
+        {"help", no_argument, 0, 'h'},
+        {"precision", required_argument, 0, 'p'},
+        {"report-in", required_argument, 0, 3},
+        {"report-out", required_argument, 0, 4},
+        {"version", no_argument, 0, 'V'}
+    };
+
+    os = option_string(temper_options);
+
+    ck_assert_str_eq(os, "dfhp:V");
+    free(os);
+}
+END_TEST
+
 Suite *temperlib_suite(void)
 {
     Suite *s;
@@ -53,6 +79,7 @@ Suite *temperlib_suite(void)
 
     tcase_add_test(tc_core, extend_errormessage_noerror);
     tcase_add_test(tc_core, extend_errormessage_someerror);
+    tcase_add_test(tc_core, test_optionstring);
     suite_add_tcase(s, tc_core);
 
     return s;
