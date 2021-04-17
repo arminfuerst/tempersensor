@@ -58,12 +58,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
-    - name: build
+    - name: install check framework
+      run: sudo apt install check
+    - name: configure
       run: |
-        sudo apt install check
-        export CK_LOG_FILE_NAME=test-details.log
         CC=clang LDFLAGS='-lm' CFLAGS='-Wno-unknown-warning-option -Wswitch-default -Wno-parentheses-equality -Wno-language-extension-token -Wno-extended-offsetof -Wconditional-uninitialized -Wincompatible-pointer-types-discards-qualifiers -Wmissing-variable-declarations -Wconversion -Werror' ./configure
-        make
+    - name: make
+      run: make
+    - name: make check
+      run: |
+        export CK_LOG_FILE_NAME=test-details.log
         make check
         cat test/test-details.log
 
