@@ -76,7 +76,7 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: install required packages
-      run: sudo apt install gcc python
+      run: sudo apt install gcc python2
     - name: get OpenWRT SDK
       run: |
         wget https://downloads.openwrt.org/releases/19.07.7/targets/ath79/generic/openwrt-sdk-19.07.7-ath79-generic_gcc-7.5.0_musl.Linux-x86_64.tar.xz
@@ -107,7 +107,7 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: install required packages
-      run: sudo apt install gcc python
+      run: sudo apt install gcc python2
     - name: get OpenWRT SDK
       run: |
         wget https://downloads.openwrt.org/releases/19.07.7/targets/ramips/mt7621/openwrt-sdk-19.07.7-ramips-mt7621_gcc-7.5.0_musl.Linux-x86_64.tar.xz
