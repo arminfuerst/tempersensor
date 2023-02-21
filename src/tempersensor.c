@@ -72,14 +72,16 @@ static const unsigned short vendorId[] =
 		// TEMPerHUM / TEMPerX_V3.3 (tested),
 		// TEMPer2 / TEMPerX_V3.3 (untested)
 		// TEMPer1F / TEMPerX_V3.3 (untested)
-	0x1a86  // TEMPerX232 / TEMPerX232_V2.0 (untested)
+	0x1a86,  // TEMPerX232 / TEMPerX232_V2.0 (untested)
+	0x1a86  // TEMPerHUM / TEMPerHUM_V3.9
 };
 static const unsigned short productId[] =
 {
 	0x660c,
 	0x7401,
 	0x2107,
-	0x5523
+	0x5523,
+	0xe025
 };
 
 struct config
@@ -720,6 +722,31 @@ static int evaluate_device_details(void)
 		{
 			debug_print("Unknown firmware '%s'\n", device.firmware);
 			print_error("Unknown 413d:2107 device");
+			return 0;
+		}
+	}
+	else if ((device.vendor_id == 0x1a86) &&
+		(device.product_id == 0xe025))
+	{
+		if (!strncmp(device.firmware, "TEMPerHUM_V3.9", 14))
+		{
+			debug_print("Detected TEMPerHUM_V3.9\n");
+			device.amount_value_responses = 1;
+			if (device.conversion_method == -1)
+				device.conversion_method = 2;
+			device.sensors[0][0] = INT_TEMP;
+			device.sensors[0][1] = INT_HUM;
+			device.sensors[1][0] = NO_SENSOR;
+			device.sensors[1][1] = NO_SENSOR;
+			if (config.in_sensor == -1)
+				config.in_sensor = INT_HUM;
+			if (config.out_sensor == -1)
+				config.out_sensor = INT_TEMP;
+		}
+		else
+		{
+			debug_print("Unknown firmware '%s'\n", device.firmware);
+			print_error("Unknown 1a86:e025 device");
 			return 0;
 		}
 	}
