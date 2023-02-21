@@ -6,3 +6,4 @@ config.status
 stamp-h1
 autom4te.cache/
 .deps/
+*.swp
