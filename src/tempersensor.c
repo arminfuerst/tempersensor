@@ -25,7 +25,7 @@
 #include "mrtg.h"
 
 #define PROGRAMNAME "tempersensor"
-#define VERSION "0.1.8"
+#define VERSION "0.1.9"
 #define USBCommunicationTimeout 5000
 
 /*
