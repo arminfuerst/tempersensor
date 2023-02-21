@@ -83,9 +83,9 @@ jobs:
       run: which g++
     - name: get OpenWRT SDK
       run: |
-        wget https://downloads.openwrt.org/releases/19.07.7/targets/ath79/generic/openwrt-sdk-19.07.7-ath79-generic_gcc-7.5.0_musl.Linux-x86_64.tar.xz
-        tar -xJf openwrt-sdk-19.07.7-ath79-generic_gcc-7.5.0_musl.Linux-x86_64.tar.xz
-        mv openwrt-sdk-19.07.7-ath79-generic_gcc-7.5.0_musl.Linux-x86_64 openwrt-sdk
+        wget https://downloads.openwrt.org/releases/22.03.3/targets/ath79/generic/openwrt-sdk-22.03.3-ath79-generic_gcc-11.2.0_musl.Linux-x86_64.tar.xz
+        tar -xJf openwrt-sdk-22.03.3-ath79-generic_gcc-11.2.0_musl.Linux-x86_64.tar.xz
+        mv openwrt-sdk-22.03.3-ath79-generic_gcc-11.2.0_musl.Linux-x86_64 openwrt-sdk
     - name: copy tempersensor into OpenWRT SDK
       run: |
         cd openwrt-sdk
